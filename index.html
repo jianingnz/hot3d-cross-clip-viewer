@@ -516,7 +516,6 @@ function makePointMat({ size = 4, depthShade = 0,
       uHasColor:  { value: useColorAttr ? 1 : 0 },
       uMaskOn:    { value: useMaskAttr ? 1 : 0 },
       uMaskR:     { value: 30 },
-      uMaskSoft:  { value: 8 },
     },
     vertexShader: `
       attribute vec3  color;
@@ -528,7 +527,6 @@ function makePointMat({ size = 4, depthShade = 0,
       uniform float uHasColor;
       uniform float uMaskOn;
       uniform float uMaskR;
-      uniform float uMaskSoft;
       void main() {
         vColor = mix(uColor, color, uHasColor);
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
