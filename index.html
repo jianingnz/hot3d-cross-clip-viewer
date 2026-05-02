@@ -314,7 +314,7 @@ kbd {
         </div>
         <div class="fld">
           <div class="lbl-row"><span title="Hide points farther than this from the anchor camera. Drop to ~1.0–1.5 m to keep only the table-top.">Max depth (m)</span><span class="v" id="zmax-lbl">1.20</span></div>
-          <input type="range" id="zmax" min="0.30" max="5.00" step="0.05" value="1.20">
+          <input type="range" id="zmax" min="0.01" max="5.00" step="0.01" value="1.20">
         </div>
       </div>
     </details>
@@ -729,6 +729,17 @@ let trackMode  = 'rainbow';   // 'rainbow' | 'sampled' | 'single'
 let gtTintCol  = new THREE.Color('#f0529c');
 let gtTintAlpha = 0.0;
 
+// Reusable scratch buffers for trail rebuild — avoids 30 fps GC churn.
+const _trailScratch = {
+  posCtrl: new Float32Array(0),
+  colCtrl: new Float32Array(0),
+  posOut:  new Float32Array(0),
+  colOut:  new Float32Array(0),
+  vec3:    [],
+  curve:   new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3()], false, 'catmullrom', 0.5),
+  _v:      new THREE.Vector3(),
+};
+
 const _hsl = new THREE.Color();
 function rebuildTrailsBaseColors() {
   // Per-trail base color depends on track-color mode.
@@ -805,62 +816,83 @@ function setFrame(fi) {
   for (let k = 0; k < K; k++) getPos(fi, k, objPos, 3*k);
   objGeom.attributes.position.needsUpdate = true;
 
-  // Update trail polylines (uses lastSeen-fallback so gaps don't crash to origin).
+  // Update trail polylines. Buffers and the curve are reused across all
+  // trails to keep per-frame allocations near zero — the original version
+  // allocated 4 Float32Arrays + N Vector3s per trail per frame which
+  // GC-thrashed at 30 fps.
   const tailStart = Math.max(0, fi - trailLen);
-  const _tmp = new Float32Array(3);
-  for (let i = 0; i < nTrails; i++) {
-    const t = trails[i];
-    const k = t.kIdx;
-    const N = (fi - tailStart + 1);
-    if (N < 2) { t.line.visible = false; continue; }
-    t.line.visible = true;
-    // Control points + colours.
-    const pos = new Float32Array(N * 3);
-    const col = new Float32Array(N * 3);
-    for (let j = 0; j < N; j++) {
-      const fj = tailStart + j;
-      // Use the same getPos so trail vertices match the dot positions.
-      // We pre-seed lastSeen by replaying frames 0..fi up to here for k —
-      // expensive in pathological cases but cheap for our F ≤ 106.
-      // Simpler: read directly from objArr if visible, else fall back to
-      // lastSeen / forward-search via getPos.
-      getPos(fj, k, _tmp, 0);
-      pos[3*j]   = _tmp[0];
-      pos[3*j+1] = _tmp[1];
-      pos[3*j+2] = _tmp[2];
-      const tt = N === 1 ? 1 : (j / (N - 1));
-      const k2 = mixLo + (1 - mixLo) * Math.pow(tt, tExp);
-      col[3*j]   = (1 - k2) + k2 * t.baseR;
-      col[3*j+1] = (1 - k2) + k2 * t.baseG;
-      col[3*j+2] = (1 - k2) + k2 * t.baseB;
-    }
-    // Optional Catmull-Rom smoothing of the polyline.
-    if (trailSmooth > 1 && N >= 2) {
-      const ctrl = new Array(N);
-      for (let j = 0; j < N; j++) ctrl[j] = new THREE.Vector3(pos[3*j], pos[3*j+1], pos[3*j+2]);
-      const curve = new THREE.CatmullRomCurve3(ctrl, false, 'catmullrom', 0.5);
-      const M = (N - 1) * trailSmooth + 1;
-      const sP = new Float32Array(M * 3);
-      const sC = new Float32Array(M * 3);
-      const v = new THREE.Vector3();
-      for (let j = 0; j < M; j++) {
-        const u = j / (M - 1);
-        curve.getPoint(u, v);
-        sP[3*j]   = v.x; sP[3*j+1] = v.y; sP[3*j+2] = v.z;
-        // Linear-interp colour by the same parameter so the gradient stays
-        // smooth across the upsampled curve.
-        const cIdx = u * (N - 1);
-        const lo = Math.floor(cIdx), hi = Math.min(N - 1, lo + 1);
-        const f  = cIdx - lo;
-        sC[3*j]   = col[3*lo]   * (1 - f) + col[3*hi]   * f;
-        sC[3*j+1] = col[3*lo+1] * (1 - f) + col[3*hi+1] * f;
-        sC[3*j+2] = col[3*lo+2] * (1 - f) + col[3*hi+2] * f;
+  const N = (fi - tailStart + 1);
+  if (N < 2) {
+    for (let i = 0; i < nTrails; i++) trails[i].line.visible = false;
+  } else {
+    const M = trailSmooth > 1 ? ((N - 1) * trailSmooth + 1) : N;
+    if (_trailScratch.posCtrl.length < N * 3)   _trailScratch.posCtrl = new Float32Array(N * 3);
+    if (_trailScratch.colCtrl.length < N * 3)   _trailScratch.colCtrl = new Float32Array(N * 3);
+    if (_trailScratch.posOut.length  < M * 3)   _trailScratch.posOut  = new Float32Array(M * 3);
+    if (_trailScratch.colOut.length  < M * 3)   _trailScratch.colOut  = new Float32Array(M * 3);
+    while (_trailScratch.vec3.length < N) _trailScratch.vec3.push(new THREE.Vector3());
+    const posCtrl = _trailScratch.posCtrl, colCtrl = _trailScratch.colCtrl;
+    const posOut  = _trailScratch.posOut,  colOut  = _trailScratch.colOut;
+    const ctrl    = _trailScratch.vec3;
+    const curve   = _trailScratch.curve;
+    const _v      = _trailScratch._v;
+
+    for (let i = 0; i < nTrails; i++) {
+      const t = trails[i];
+      const k = t.kIdx;
+      t.line.visible = true;
+      // Control points + colours.
+      for (let j = 0; j < N; j++) {
+        const fj = tailStart + j;
+        // Inline the getPos hot path (avoid call/return in tight loop).
+        const off = fj * K + k;
+        if (visArr[off]) {
+          const src = off * 3;
+          posCtrl[3*j]   = objArr[src];
+          posCtrl[3*j+1] = objArr[src + 1];
+          posCtrl[3*j+2] = objArr[src + 2];
+          lastSeen[3*k]   = objArr[src];
+          lastSeen[3*k+1] = objArr[src + 1];
+          lastSeen[3*k+2] = objArr[src + 2];
+          lastSeenInit[k] = 1;
+        } else {
+          posCtrl[3*j]   = lastSeen[3*k];
+          posCtrl[3*j+1] = lastSeen[3*k+1];
+          posCtrl[3*j+2] = lastSeen[3*k+2];
+        }
+        const tt = j / (N - 1);
+        const k2 = mixLo + (1 - mixLo) * Math.pow(tt, tExp);
+        const inv = 1 - k2;
+        colCtrl[3*j]   = inv + k2 * t.baseR;
+        colCtrl[3*j+1] = inv + k2 * t.baseG;
+        colCtrl[3*j+2] = inv + k2 * t.baseB;
       }
-      t.geom.setPositions(sP);
-      t.geom.setColors(sC);
-    } else {
-      t.geom.setPositions(pos);
-      t.geom.setColors(col);
+      if (trailSmooth > 1) {
+        // Reuse Vector3 pool + shared curve.
+        for (let j = 0; j < N; j++) {
+          ctrl[j].set(posCtrl[3*j], posCtrl[3*j+1], posCtrl[3*j+2]);
+        }
+        curve.points.length = 0;
+        for (let j = 0; j < N; j++) curve.points.push(ctrl[j]);
+        for (let j = 0; j < M; j++) {
+          const u = j / (M - 1);
+          curve.getPoint(u, _v);
+          posOut[3*j]   = _v.x; posOut[3*j+1] = _v.y; posOut[3*j+2] = _v.z;
+          const cIdx = u * (N - 1);
+          const lo = Math.floor(cIdx);
+          const hi = lo + 1 < N ? lo + 1 : lo;
+          const f  = cIdx - lo;
+          const inv = 1 - f;
+          colOut[3*j]   = colCtrl[3*lo]   * inv + colCtrl[3*hi]   * f;
+          colOut[3*j+1] = colCtrl[3*lo+1] * inv + colCtrl[3*hi+1] * f;
+          colOut[3*j+2] = colCtrl[3*lo+2] * inv + colCtrl[3*hi+2] * f;
+        }
+        t.geom.setPositions(posOut.subarray(0, M * 3));
+        t.geom.setColors   (colOut.subarray(0, M * 3));
+      } else {
+        t.geom.setPositions(posCtrl.subarray(0, N * 3));
+        t.geom.setColors   (colCtrl.subarray(0, N * 3));
+      }
     }
   }
   // Hide extra trails
