@@ -339,34 +339,42 @@ kbd {
       </summary>
       <div class="sb-body-inner">
         <div class="fld">
-          <div class="lbl-row"><span># trails</span><span class="v" id="n-trails-lbl">32</span></div>
-          <input type="range" id="n-trails" min="0" max="256" step="1" value="32">
+          <div class="lbl-row"><span># trails</span><span class="v" id="n-trails-lbl">48</span></div>
+          <input type="range" id="n-trails" min="0" max="256" step="1" value="48">
         </div>
         <div class="fld">
-          <div class="lbl-row"><span>Trail length (frames)</span><span class="v" id="trail-len-lbl">28</span></div>
-          <input type="range" id="trail-len" min="2" max="105" step="1" value="28">
+          <div class="lbl-row"><span>Trail length (frames)</span><span class="v" id="trail-len-lbl">60</span></div>
+          <input type="range" id="trail-len" min="2" max="105" step="1" value="60">
         </div>
         <div class="fld">
-          <div class="lbl-row"><span>Trail line width (px)</span><span class="v" id="trail-w-lbl">2.5</span></div>
-          <input type="range" id="trail-w" min="0.5" max="8" step="0.1" value="2.5">
+          <div class="lbl-row"><span>Trail line width (px)</span><span class="v" id="trail-w-lbl">3.5</span></div>
+          <input type="range" id="trail-w" min="0.5" max="10" step="0.1" value="3.5">
         </div>
         <div class="fld">
-          <div class="lbl-row"><span title="Catmull-Rom samples per inter-frame interval. 1 = polyline through raw frames; higher = smoother curves.">Trail smoothness</span><span class="v" id="trail-smooth-lbl">1</span></div>
-          <input type="range" id="trail-smooth" min="1" max="12" step="1" value="1">
+          <div class="lbl-row"><span title="Catmull-Rom samples per inter-frame interval. 1 = polyline through raw frames; higher = silkier curves.">Trail smoothness</span><span class="v" id="trail-smooth-lbl">4</span></div>
+          <input type="range" id="trail-smooth" min="1" max="12" step="1" value="4">
         </div>
         <div class="fld">
-          <div class="lbl-row"><span title="0 = oldest part of trail fades to white; 1 = no fade.">Gradient floor</span><span class="v" id="mix-lo-lbl">0.18</span></div>
-          <input type="range" id="mix-lo" min="0" max="0.95" step="0.02" value="0.18">
+          <div class="lbl-row"><span title="Track color mode. Rainbow gives a different hue per track (easy to distinguish). Sampled = per-point RGB at the anchor frame. Single = uniform colour from the picker below.">Track color mode</span></div>
+          <select class="btn" id="track-mode">
+            <option value="rainbow" selected>Rainbow (per-track hue)</option>
+            <option value="sampled">Sampled RGB (anchor frame)</option>
+            <option value="single">Single color (picker)</option>
+          </select>
+        </div>
+        <div class="color-row">
+          <input type="color" id="col-gt" value="#f0529c" title="Used in 'Single color' mode, or as the tint blend in 'Sampled RGB' mode.">
+          <span class="cn">Trail color <span class="h" id="col-gt-h">#f0529c</span></span>
+          <input type="range" class="alpha" id="alpha-gt-tint" min="0" max="1" step="0.02" value="0" title="In Sampled mode: 0 = sampled RGB, 1 = full picker tint. Ignored in Rainbow / Single modes.">
+          <span class="alpha-lbl" id="alpha-gt-tint-lbl">0.00</span>
+        </div>
+        <div class="fld" style="margin-top:8px;">
+          <div class="lbl-row"><span title="0 = oldest part of trail fades to white; 1 = no fade.">Gradient floor</span><span class="v" id="mix-lo-lbl">0.30</span></div>
+          <input type="range" id="mix-lo" min="0" max="0.95" step="0.02" value="0.30">
         </div>
         <div class="fld">
           <div class="lbl-row"><span title="<1 boosts saturation of older frames">Gradient curve</span><span class="v" id="t-exp-lbl">1.0</span></div>
           <input type="range" id="t-exp" min="0.2" max="2" step="0.05" value="1">
-        </div>
-        <div class="color-row">
-          <input type="color" id="col-gt" value="#f0529c" title="Tint blended on top of each trail's per-point sampled RGB. With the slider at 0 = trails use sampled color; at 1 = trails use the picker color uniformly.">
-          <span class="cn">Trail color <span class="h" id="col-gt-h">#f0529c</span></span>
-          <input type="range" class="alpha" id="alpha-gt-tint" min="0" max="1" step="0.02" value="0">
-          <span class="alpha-lbl" id="alpha-gt-tint-lbl">0.00</span>
         </div>
       </div>
     </details>
@@ -711,27 +719,39 @@ axes.material.depthTest = false;
 root.add(axes);
 
 // ── Trail rebuild (call when N_trails / colors / gradient change) ──
-let nTrails    = 32;
-let trailLen   = 28;
-let trailW     = 2.5;
-let trailSmooth= 1;
-let mixLo      = 0.18;
+let nTrails    = 48;
+let trailLen   = 60;
+let trailW     = 3.5;
+let trailSmooth= 4;
+let mixLo      = 0.30;
 let tExp       = 1.0;
+let trackMode  = 'rainbow';   // 'rainbow' | 'sampled' | 'single'
 let gtTintCol  = new THREE.Color('#f0529c');
 let gtTintAlpha = 0.0;
 
+const _hsl = new THREE.Color();
 function rebuildTrailsBaseColors() {
-  // Per-trail base color = sampled obj_color, optionally tinted toward gtTintCol.
+  // Per-trail base color depends on track-color mode.
   for (let i = 0; i < TRAIL_MAX; i++) {
     if (i >= nTrails) { trails[i].line.visible = false; continue; }
     trails[i].line.visible = true;
     const t = trails[i];
     const k = t.kIdx;
-    let r = objColArr[3*k], g = objColArr[3*k+1], b = objColArr[3*k+2];
-    // mix toward tint
-    r = (1 - gtTintAlpha) * r + gtTintAlpha * gtTintCol.r;
-    g = (1 - gtTintAlpha) * g + gtTintAlpha * gtTintCol.g;
-    b = (1 - gtTintAlpha) * b + gtTintAlpha * gtTintCol.b;
+    let r, g, b;
+    if (trackMode === 'rainbow') {
+      // Cycle hue across the visible-trail set so adjacent trails look different.
+      const hue = (i * 0.6180339887) % 1;     // golden-ratio hue jitter
+      _hsl.setHSL(hue, 0.78, 0.55);
+      r = _hsl.r; g = _hsl.g; b = _hsl.b;
+    } else if (trackMode === 'single') {
+      r = gtTintCol.r; g = gtTintCol.g; b = gtTintCol.b;
+    } else {
+      // sampled RGB at anchor, optionally mixed toward tint.
+      r = objColArr[3*k]; g = objColArr[3*k+1]; b = objColArr[3*k+2];
+      r = (1 - gtTintAlpha) * r + gtTintAlpha * gtTintCol.r;
+      g = (1 - gtTintAlpha) * g + gtTintAlpha * gtTintCol.g;
+      b = (1 - gtTintAlpha) * b + gtTintAlpha * gtTintCol.b;
+    }
     t.baseR = r; t.baseG = g; t.baseB = b;
     t.mat.linewidth = trailW;
   }
@@ -899,6 +919,9 @@ bind('mix-lo',      v => { mixLo = parseFloat(v); setLbl('mix-lo-lbl', parseFloa
 bind('t-exp',       v => { tExp  = parseFloat(v); setLbl('t-exp-lbl', parseFloat(v).toFixed(2)); setFrame(frame); });
 bind('col-gt',      v => { document.getElementById('col-gt-h').textContent = v; gtTintCol.set(v); rebuildTrailsBaseColors(); setFrame(frame); }, 'input');
 bind('alpha-gt-tint', v => { gtTintAlpha = parseFloat(v); setLbl('alpha-gt-tint-lbl', parseFloat(v).toFixed(2)); rebuildTrailsBaseColors(); setFrame(frame); });
+document.getElementById('track-mode').addEventListener('change', e => {
+  trackMode = e.target.value; rebuildTrailsBaseColors(); setFrame(frame);
+});
 
 // Camera sliders
 bind('cam-w',       v => { setLbl('cam-w-lbl', parseFloat(v).toFixed(1)); buildCamLines(); }, 'input');
@@ -952,11 +975,14 @@ document.getElementById('sb-close').addEventListener('click', closeSb);
 document.getElementById('sb-reset').addEventListener('click', () => {
   const defaults = {
     'pc-size': 3, 'obj-size': 7, 'mask-r': 30, 'zmax': 1.20,
-    'n-trails': 32, 'trail-len': 28, 'trail-w': 2.5, 'trail-smooth': 1,
-    'mix-lo': 0.18, 't-exp': 1.0,
+    'n-trails': 48, 'trail-len': 60, 'trail-w': 3.5, 'trail-smooth': 4,
+    'mix-lo': 0.30, 't-exp': 1.0,
     'alpha-gt-tint': 0,
     'cam-w': 2, 'cam-m': 1, 'cam-alpha': 0.9,
   };
+  // Reset the track-mode select too.
+  const tm = document.getElementById('track-mode');
+  tm.value = 'rainbow'; tm.dispatchEvent(new Event('change'));
   for (const [id, v] of Object.entries(defaults)) {
     const el = document.getElementById(id);
     el.value = v; el.dispatchEvent(new Event('input'));
