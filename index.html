@@ -499,12 +499,12 @@ window.addEventListener('resize', fit);
 function makePointMat({ size = 4, opacity = 1, depthShade = 0,
                         shadeNear = 0.4, shadeFar = 3.5,
                         color = 0xffffff, vertexColors = false,
-                        useMaskAttr = false } = {}) {
+                        useMaskAttr = false, depthTest = true } = {}) {
   const defines = {};
   if (vertexColors) defines.USE_COLOR    = '';
   if (useMaskAttr)  defines.USE_MASKDIST = '';
   return new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, depthTest: false, defines,
+    transparent: true, depthWrite: false, depthTest, defines,
     uniforms: {
       uSize:       { value: size },
       uOpacity:    { value: opacity },
@@ -616,7 +616,7 @@ let sceneObj;
 // ── GT object cloud (current frame, per-point sampled RGB) ────────
 const objMat = makePointMat({
   size: 7, opacity: 1.0, depthShade: 0.0,
-  vertexColors: true,
+  vertexColors: true, depthTest: false,
 });
 const objPos = new Float32Array(K * 3);
 const objCol = new Float32Array(K * 3);
