@@ -495,62 +495,26 @@ function fit() {
 }
 window.addEventListener('resize', fit);
 
-// ── Round-sprite point shader (motion-teaser style: opaque hard discard) ──
-// One shader, one set of uniforms; the mask is gated by `uMaskOn`.
-// `aMaskDist` and `color` are declared unconditionally — if the geometry
-// doesn't supply them, WebGL gives default values (0 / vec3(0)) and the
-// shader uses uniforms instead.
-function makePointMat({ size = 4, depthShade = 0,
-                        shadeNear = 0.4, shadeFar = 3.5,
-                        color = 0xffffff, useColorAttr = false,
-                        useMaskAttr = false,
-                        depthTest = true, depthWrite = true } = {}) {
-  return new THREE.ShaderMaterial({
-    transparent: false, depthTest, depthWrite,
-    uniforms: {
-      uSize:      { value: size },
-      uShade:     { value: depthShade },
-      uShadeNear: { value: shadeNear },
-      uShadeFar:  { value: shadeFar },
-      uColor:     { value: new THREE.Color(color) },
-      uHasColor:  { value: useColorAttr ? 1 : 0 },
-      uMaskOn:    { value: useMaskAttr ? 1 : 0 },
-      uMaskR:     { value: 30 },
-    },
-    vertexShader: `
-      attribute vec3  color;
-      attribute float aMaskDist;
-      varying vec3  vColor;
-      varying float vDepth;
-      uniform float uSize;
-      uniform vec3  uColor;
-      uniform float uHasColor;
-      uniform float uMaskOn;
-      uniform float uMaskR;
-      void main() {
-        vColor = mix(uColor, color, uHasColor);
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        vDepth = max(0.05, -mv.z);
-        float ps = uSize;
-        if (uMaskOn > 0.5 && aMaskDist < uMaskR) ps = 0.0;
-        gl_PointSize = ps;
-        gl_Position  = projectionMatrix * mv;
-      }`,
-    fragmentShader: `
-      varying vec3  vColor;
-      varying float vDepth;
-      uniform float uShade;
-      uniform float uShadeNear;
-      uniform float uShadeFar;
-      void main() {
-        vec2 uv = gl_PointCoord * 2.0 - 1.0;
-        if (dot(uv, uv) > 1.0) discard;
-        float t = clamp((vDepth - uShadeNear) / (uShadeFar - uShadeNear), 0.0, 1.0);
-        vec3 c = mix(vColor, vec3(1.0), uShade * t);
-        gl_FragColor = vec4(c, 1.0);
-      }`,
-  });
+// ── Round-sprite circle texture (used as `map` for round AA dots) ──
+function makeCircleSprite(size = 64) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, size, size);
+  // soft anti-aliased disc
+  const grad = ctx.createRadialGradient(size/2, size/2, size/2 - 6, size/2, size/2, size/2);
+  grad.addColorStop(0,   'rgba(255,255,255,1)');
+  grad.addColorStop(0.85,'rgba(255,255,255,1)');
+  grad.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.premultipliedAlpha = false;
+  return tex;
 }
+const CIRCLE_TEX = makeCircleSprite(64);
 
 // ── Data load ─────────────────────────────────────────────────────
 async function fetchBin(url) { const r = await fetch(url); if(!r.ok) throw new Error(url); return new Float32Array(await r.arrayBuffer()); }
@@ -571,35 +535,58 @@ document.getElementById('meta-block').innerHTML =
   `MoGe a=${meta.moge.a.toFixed(3)} b=${meta.moge.b.toFixed(3)}m · ` +
   `resid ${meta.moge.median_resid_mm.toFixed(0)}mm · ${meta.scene.n_pts.toLocaleString()} scene · ${K} obj · ${F}f`;
 
-// ── Static scene cloud with masking ───────────────────────────────
-const sceneMat = makePointMat({
-  size: 3, depthShade: 0.55, shadeNear: 0.4, shadeFar: 3.5,
-  useColorAttr: true, useMaskAttr: true,
-});
-let sceneObj;
-{
-  const N = sceneArr.length / 6;
-  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
-  for (let i = 0; i < N; i++) {
-    pos[3*i]   = sceneArr[6*i];
-    pos[3*i+1] = sceneArr[6*i+1];
-    pos[3*i+2] = sceneArr[6*i+2];
-    col[3*i]   = sceneArr[6*i+3];
-    col[3*i+1] = sceneArr[6*i+4];
-    col[3*i+2] = sceneArr[6*i+5];
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position',  new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('color',     new THREE.BufferAttribute(col, 3));
-  g.setAttribute('aMaskDist', new THREE.BufferAttribute(minDistArr, 1));
-  sceneObj = new THREE.Points(g, sceneMat);
-  root.add(sceneObj);
+// ── Static scene cloud (PointsMaterial + circle-texture map) ────
+// Mask is applied CPU-side: rebuild the position+color BufferAttributes
+// to include only points where min_pix_dist >= radius. ~120k → ms-level.
+const N_SCENE = sceneArr.length / 6;
+const sceneAllPos = new Float32Array(N_SCENE * 3);
+const sceneAllCol = new Float32Array(N_SCENE * 3);
+for (let i = 0; i < N_SCENE; i++) {
+  sceneAllPos[3*i]   = sceneArr[6*i];
+  sceneAllPos[3*i+1] = sceneArr[6*i+1];
+  sceneAllPos[3*i+2] = sceneArr[6*i+2];
+  sceneAllCol[3*i]   = sceneArr[6*i+3];
+  sceneAllCol[3*i+1] = sceneArr[6*i+4];
+  sceneAllCol[3*i+2] = sceneArr[6*i+5];
 }
+const sceneGeom = new THREE.BufferGeometry();
+const scenePos  = new Float32Array(N_SCENE * 3);
+const sceneCol  = new Float32Array(N_SCENE * 3);
+sceneGeom.setAttribute('position', new THREE.BufferAttribute(scenePos, 3).setUsage(THREE.DynamicDrawUsage));
+sceneGeom.setAttribute('color',    new THREE.BufferAttribute(sceneCol, 3).setUsage(THREE.DynamicDrawUsage));
+const sceneMat = new THREE.PointsMaterial({
+  size: 0.0035, vertexColors: true, sizeAttenuation: true,
+  map: CIRCLE_TEX, alphaTest: 0.5, transparent: false,
+});
+const sceneObj = new THREE.Points(sceneGeom, sceneMat);
+sceneObj.frustumCulled = false;
+root.add(sceneObj);
+
+let maskRadius = 30;
+function rebuildScene() {
+  let n = 0;
+  for (let i = 0; i < N_SCENE; i++) {
+    if (minDistArr[i] >= maskRadius) {
+      scenePos[3*n]   = sceneAllPos[3*i];
+      scenePos[3*n+1] = sceneAllPos[3*i+1];
+      scenePos[3*n+2] = sceneAllPos[3*i+2];
+      sceneCol[3*n]   = sceneAllCol[3*i];
+      sceneCol[3*n+1] = sceneAllCol[3*i+1];
+      sceneCol[3*n+2] = sceneAllCol[3*i+2];
+      n++;
+    }
+  }
+  sceneGeom.setDrawRange(0, n);
+  sceneGeom.attributes.position.needsUpdate = true;
+  sceneGeom.attributes.color.needsUpdate    = true;
+}
+rebuildScene();
 
 // ── GT object cloud (current frame, per-point sampled RGB) ────────
-const objMat = makePointMat({
-  size: 7, depthShade: 0.0,
-  useColorAttr: true, depthTest: false, depthWrite: false,
+const objMat = new THREE.PointsMaterial({
+  size: 0.008, vertexColors: true, sizeAttenuation: true,
+  map: CIRCLE_TEX, alphaTest: 0.5, transparent: false,
+  depthTest: false, depthWrite: false,
 });
 const objPos = new Float32Array(K * 3);
 const objCol = new Float32Array(K * 3);
@@ -612,6 +599,7 @@ const objGeom = new THREE.BufferGeometry();
 objGeom.setAttribute('position', new THREE.BufferAttribute(objPos, 3).setUsage(THREE.DynamicDrawUsage));
 objGeom.setAttribute('color',    new THREE.BufferAttribute(objCol, 3));
 const objObj = new THREE.Points(objGeom, objMat);
+objObj.frustumCulled = false;
 root.add(objObj);
 
 // ── Trail subset: pick stable points (high anchor-vis count over time) ──
@@ -842,12 +830,15 @@ document.getElementById('step-fwd' ).addEventListener('click', () => { frame = M
 document.getElementById('rate-sel').addEventListener('change', e => { rate = parseFloat(e.target.value); });
 
 // Point cloud sliders
-bind('pc-size',     v => { sceneMat.uniforms.uSize.value  = parseFloat(v); setLbl('pc-size-lbl', parseFloat(v).toFixed(1)); });
-bind('pc-shade',    v => { sceneMat.uniforms.uShade.value = parseFloat(v); setLbl('pc-shade-lbl', parseFloat(v).toFixed(2)); });
-bind('obj-size',    v => { objMat.uniforms.uSize.value    = parseFloat(v); setLbl('obj-size-lbl', parseFloat(v).toFixed(1)); });
-bind('mask-r',      v => { sceneMat.uniforms.uMaskR.value = parseFloat(v); setLbl('mask-r-lbl', v); });
-// pc-opacity / mask-soft sliders kept for layout but no-op in the opaque
-// shader path; if you re-enable a soft edge later, flip transparent on.
+// PointsMaterial.size is in world units (sizeAttenuation=true). Slider
+// values 1..12 map to 0.001..0.012 m; default 3 → 0.003 m.
+bind('pc-size',     v => { sceneMat.size = parseFloat(v) * 0.001; setLbl('pc-size-lbl', parseFloat(v).toFixed(1)); });
+bind('obj-size',    v => { objMat.size   = parseFloat(v) * 0.001; setLbl('obj-size-lbl', parseFloat(v).toFixed(1)); });
+bind('mask-r',      v => { maskRadius    = parseFloat(v); setLbl('mask-r-lbl', v); rebuildScene(); });
+// pc-shade / pc-opacity / mask-soft kept for layout; not driving the
+// PointsMaterial path. depth shade is implicit via map+sizeAttenuation;
+// soft mask edge isn't applicable to the alphaTest pipeline.
+bind('pc-shade',    v => { setLbl('pc-shade-lbl', parseFloat(v).toFixed(2)); });
 bind('pc-opacity',  v => { setLbl('pc-opacity-lbl', parseFloat(v).toFixed(2)); });
 bind('mask-soft',   v => { setLbl('mask-soft-lbl', v); });
 
