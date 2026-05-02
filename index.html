@@ -1,328 +1,963 @@
-<!doctype html>
-<html lang="en" data-theme="dark">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HOT3D — cross-clip 3D scene</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0d0d0d;
-    --bg-card: #161616;
-    --bg-header: #1a1a1a;
-    --border: #222;
-    --text: #d4d4d4;
-    --text-heading: #f0f0f0;
-    --text-secondary: #888;
-    --accent: #c98c50;
-  }
-  [data-theme="light"] {
-    --bg: #f5f5f0;
-    --bg-card: #ffffff;
-    --bg-header: #f0efe8;
-    --border: #ddd;
-    --text: #333;
-    --text-heading: #111;
-    --text-secondary: #666;
-    --accent: #b06f2c;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
-               font-family: 'Inter', system-ui, sans-serif; height: 100%; overflow: hidden; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-  ::-webkit-scrollbar-track { background: transparent; }
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #fafafa;
+  --bg-card: #ffffff;
+  --border: #e5e7eb;
+  --text: #1f2937;
+  --text-heading: #0f172a;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --page-bg-top:    #ffffff;
+  --page-bg-bottom: #f3f4f6;
+  --c-gt:   #f0529c;     /* GT trail (motion-teaser palette) */
+  --c-cam:  #34d399;     /* clip-A camera trail */
+  --c-cam2: #fbbf24;     /* clip-B camera trail */
+  --sb-width: 340px;
+}
+html, body {
+  background: linear-gradient(180deg, var(--page-bg-top) 0%, var(--page-bg-bottom) 100%);
+  min-height: 100vh; font-family: 'Inter', sans-serif; color: var(--text); line-height: 1.5;
+}
+body { padding-right: 0; transition: padding-right .25s ease; }
+body.sb-open { padding-right: var(--sb-width); }
+.page { max-width: 1500px; margin: 0 auto; padding: 24px; }
 
-  #app { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; max-width: 100vw; }
-  header { padding: 18px 28px; border-bottom: 1px solid var(--border);
-           display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; }
-  h1 { font-family: 'Playfair Display', serif; font-weight: 700;
-       font-size: 1.3rem; color: var(--text-heading); margin: 0; letter-spacing: -0.01em; }
-  .sub { color: var(--text-secondary); font-size: 0.78rem; margin-top: 2px; }
-  .toggle { background: transparent; border: 1px solid var(--border);
-            color: var(--text); border-radius: 6px; padding: 6px 10px;
-            cursor: pointer; font-size: 0.8rem; }
+header.masthead {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid var(--border);
+}
+header h1 { font-family: 'Playfair Display', serif; font-size: 1.7rem; color: var(--text-heading); }
+header .sub { font-size: .8rem; color: var(--text-secondary); margin-top: 4px; max-width: 760px; }
+header .meta { font-size: .72rem; color: var(--text-muted); font-family: ui-monospace, monospace; text-align: right; }
+header .meta b { color: var(--text-secondary); font-weight: 600; }
+header .hdr-actions { display:flex; gap:8px; align-items:center; }
+.icon-btn {
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: .72rem;
+  font-family: inherit; line-height: 1;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.icon-btn:hover { background: #f3f4f6; }
+.icon-btn .ic { font-size: .9rem; }
 
-  #stage { position: relative; width: 100%; height: 100%; }
-  #canvas { width: 100%; height: 100%; display: block; }
-  #overlay { position: absolute; top: 12px; left: 12px; color: var(--text-secondary);
-             font-family: ui-monospace, monospace; font-size: 0.75rem;
-             background: rgba(0,0,0,0.55); border: 1px solid var(--border); border-radius: 6px;
-             padding: 8px 10px; pointer-events: none; max-width: 260px; }
-  #overlay b { color: var(--text-heading); font-family: inherit; }
+.row { display: grid; gap: 16px; margin-bottom: 16px; }
+.card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; display: flex; flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.card .ttl {
+  font-size: .72rem; padding: 8px 12px; border-bottom: 1px solid var(--border);
+  color: var(--text-secondary); text-transform: uppercase; letter-spacing: .07em;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.card .ttl .lg-tag { font-size: .68rem; color: var(--text-muted); }
 
-  footer { padding: 12px 28px; border-top: 1px solid var(--border);
-           display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  footer button { background: var(--bg-card); color: var(--text);
-                  border: 1px solid var(--border); border-radius: 6px;
-                  padding: 7px 14px; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
-  footer button:hover { border-color: var(--accent); color: var(--accent); }
-  footer input[type=range] { flex: 1; min-width: 200px; accent-color: var(--accent); }
-  footer .pos { color: var(--text-secondary); font-family: ui-monospace, monospace; font-size: 0.8rem; }
-  footer .pos.boundary { color: #d97a3c; }
-  footer label { color: var(--text-secondary); font-size: 0.8rem; }
-  footer input[type=range].size { width: 90px; }
+.panel-card .body { width: 100%; flex: 1; min-height: 560px; position: relative; background: #555; }
+.panel-card .body canvas { display: block; width: 100%; height: 100%; }
 
-  kbd { font-family: ui-monospace, monospace; font-size: 0.7rem;
-        background: var(--bg-header); border: 1px solid var(--border);
-        border-bottom-width: 2px; border-radius: 4px;
-        padding: 1px 5px; color: var(--text-secondary); }
+.overlay {
+  position: absolute; top: 12px; left: 12px;
+  font-family: ui-monospace, monospace; font-size: .72rem;
+  color: rgba(255,255,255,0.95); background: rgba(0,0,0,0.42);
+  border: 1px solid rgba(255,255,255,0.16); border-radius: 6px;
+  padding: 8px 11px; pointer-events: none; backdrop-filter: blur(2px);
+}
+.overlay b { color: #ffffff; font-family: inherit; }
+.overlay .boundary { color: #fbbf24; }
+
+footer.foot { text-align: center; font-size: .7rem; color: var(--text-muted); margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+footer a { color: #2563eb; text-decoration: none; }
+
+kbd {
+  font-family: ui-monospace, monospace; font-size: .68rem;
+  background: #f3f4f6; border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 3px; padding: 1px 5px; color: var(--text-secondary);
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+.sidebar {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: var(--sb-width);
+  background: var(--bg-card);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 28px rgba(15,23,42,0.06);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .25s ease;
+  z-index: 50; font-size: .78rem;
+}
+.sidebar.open { transform: translateX(0); }
+.sidebar .sb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+  position: sticky; top: 0; z-index: 2;
+}
+.sidebar .sb-head h2 {
+  font-family: 'Playfair Display', serif; font-size: 1rem; color: var(--text-heading);
+  font-weight: 700; letter-spacing: .01em;
+}
+.sidebar .sb-head .sb-head-actions { display:flex; gap:6px; }
+.sidebar .sb-body {
+  flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0 24px 0;
+}
+.sidebar .sb-body::-webkit-scrollbar { width: 8px; }
+.sidebar .sb-body::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+.sidebar .sb-body::-webkit-scrollbar-track { background: transparent; }
+
+.sb-section { border-bottom: 1px solid var(--border); }
+.sb-section:last-child { border-bottom: 0; }
+.sb-section > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: center; gap: 8px; padding: 11px 16px;
+  font-size: .76rem; font-weight: 600; color: var(--text-heading);
+  text-transform: uppercase; letter-spacing: .07em;
+  transition: background .15s ease;
+}
+.sb-section > summary:hover { background: #f9fafb; }
+.sb-section > summary::-webkit-details-marker { display: none; }
+.sb-section > summary .chev {
+  width: 14px; height: 14px; flex-shrink: 0;
+  transition: transform .2s ease; color: var(--text-muted);
+}
+.sb-section[open] > summary .chev { transform: rotate(90deg); }
+.sb-section > summary .summary-tag {
+  margin-left: auto; font-size: .65rem; color: var(--text-muted);
+  font-weight: 400; text-transform: none; letter-spacing: 0;
+}
+.sb-section .sb-body-inner { padding: 6px 16px 16px 16px; }
+
+.fld { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.fld:last-child { margin-bottom: 0; }
+.fld > .lbl-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: .7rem; color: var(--text-secondary);
+}
+.fld > .lbl-row .v { font-family: ui-monospace, monospace; color: var(--text-muted); font-size: .68rem; }
+.fld input[type=range] { width: 100%; min-width: 0; accent-color: #1f2937; height: 18px; }
+.fld input[type=color] {
+  width: 36px; height: 26px;
+  border: 1px solid var(--border); border-radius: 5px;
+  padding: 0; background: none; cursor: pointer;
+}
+.fld-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px;
+}
+.fld-grid .fld { margin-bottom: 0; }
+.color-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.color-row .cn { font-size: .72rem; color: var(--text); flex: 1; min-width: 0; }
+.color-row .cn .h { font-family: ui-monospace, monospace; font-size: .65rem; color: var(--text-muted); margin-left: 4px; }
+.color-row .alpha { flex: 0 0 64px; min-width: 64px; height: 14px; accent-color: #1f2937; }
+.color-row .alpha-lbl { flex: 0 0 32px; text-align: right; font-family: ui-monospace, monospace; font-size: .65rem; color: var(--text-muted); }
+
+.toggle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.toggle-grid .btn {
+  width: 100%; padding: 7px 8px; font-size: .68rem;
+  text-align: center; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.toggle-grid .btn.full { grid-column: 1 / -1; }
+
+.btn {
+  background: #f3f4f6; border: 1px solid var(--border); color: var(--text);
+  padding: 6px 10px; border-radius: 5px; cursor: pointer;
+  font-size: .72rem; font-family: inherit;
+}
+.btn:hover { background: #e5e7eb; }
+.btn.on { background: #1f2937; color: white; border-color: #1f2937; }
+
+.pb-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.pb-row .btn { padding: 7px 10px; font-size: .8rem; }
+.pb-row #scrub { flex: 1; min-width: 0; accent-color: #1f2937; }
+.pb-row .frame-lbl { font-size: .68rem; color: var(--text-muted); min-width: auto; font-family: ui-monospace, monospace; }
+
+.sb-handle {
+  position: fixed; top: 96px; right: 0;
+  background: var(--bg-card); border: 1px solid var(--border); border-right: 0;
+  border-radius: 8px 0 0 8px; padding: 10px 8px; cursor: pointer;
+  box-shadow: -4px 0 16px rgba(15,23,42,0.06);
+  z-index: 49; font-size: .7rem; color: var(--text);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transition: opacity .2s ease, transform .25s ease;
+}
+.sb-handle:hover { background: #f9fafb; }
+.sb-handle.hidden { opacity: 0; pointer-events: none; transform: translateX(20px); }
+.sb-handle .vt {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  letter-spacing: .14em; text-transform: uppercase; font-size: .65rem; color: var(--text-secondary);
+}
+
+.sb-legend { padding: 4px 16px 14px 16px; }
+.sb-legend .legend { display:flex; flex-direction: column; gap: 6px; font-size: .7rem; color: var(--text-secondary); }
+.sb-legend .legend .sw { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:8px; vertical-align: middle; border: 1px solid rgba(0,0,0,0.05); }
+.sb-legend .legend .sw.line { width:18px; height:3px; border-radius:2px; }
+
+@media (max-width: 1024px) {
+  body.sb-open { padding-right: 0; }
+  .sidebar { box-shadow: -16px 0 40px rgba(15,23,42,0.18); }
+}
 </style>
+<script type="importmap">
+{ "imports": {
+  "three":          "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":  "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
 </head>
 <body>
-<div id="app">
-  <header>
+<div class="page">
+  <header class="masthead">
     <div>
-      <h1>HOT3D — cross-clip 3D scene (clip 1995 ⇒ 1996)</h1>
-      <div class="sub">Static MoGe-1 scene cloud · GT object cloud (per-frame, 2000 pts) · camera trail · canonical frame = clip-001995 frame 84.</div>
+      <h1>HOT3D — cross-clip 3D scene</h1>
+      <div class="sub">
+        Static MoGe-1 scene cloud (object regions live-masked by 2D-track radius) +
+        per-frame GT object cloud (RGB sampled at the anchor frame, held constant across frames).
+        Two HOT3D-Aria clips stitched at frame 84 of clip-001995 → frame 0 of clip-001996.
+      </div>
     </div>
-    <button class="toggle" id="theme">light</button>
+    <div class="hdr-actions">
+      <span class="meta" id="meta-block">loading…</span>
+      <button class="icon-btn" id="open-sb" title="Open controls (or press .)">
+        <span class="ic">⚙︎</span><span>Controls</span>
+      </button>
+    </div>
   </header>
 
-  <div id="stage">
-    <canvas id="canvas"></canvas>
-    <div id="overlay">
-      <b id="ovframe">frame 0 / 105</b><br>
-      <span id="ovsrc">clip-001995 t=84</span><br>
-      <span id="ovab"></span><br>
-      <span id="ovstats"></span>
+  <div class="card panel-card">
+    <div class="ttl">
+      <span>3D scene</span>
+      <span class="lg-tag">drag · scroll · play</span>
+    </div>
+    <div class="body" id="stage">
+      <canvas id="canvas"></canvas>
+      <div class="overlay">
+        <b id="ovframe">frame 0 / 105</b><br>
+        <span id="ovsrc">clip-001995 t=84</span>
+      </div>
     </div>
   </div>
 
-  <footer>
-    <button id="play">⏵ play</button>
-    <span class="pos" id="pos">0 / 105</span>
-    <input id="slider" type="range" min="0" max="105" value="0">
-    <label>scene <input class="size" id="size_scene" type="range" min="1" max="10" step="0.5" value="2.5"></label>
-    <label>object <input class="size" id="size_obj" type="range" min="2" max="20" step="0.5" value="6"></label>
-    <button id="reset">reset view</button>
-    <span class="pos"><kbd>space</kbd> play · <kbd>←</kbd>/<kbd>→</kbd> step · <kbd>r</kbd> reset</span>
+  <footer class="foot">
+    Data: HOT3D-Aria clips 1995/1996. Depth: MoGe-1 (affine-invariant), aligned via 8398 GT 2D-track anchor pixels.
+    Repo: <a href="https://github.com/jianingnz/hot3d-cross-clip-viewer">jianingnz/hot3d-cross-clip-viewer</a>.
+    Press <kbd>.</kbd> to toggle the controls panel.
   </footer>
 </div>
 
-<script type="importmap">
-{ "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-} }
-</script>
+<button class="sb-handle" id="sb-handle" title="Open controls (or press .)">
+  <span class="vt">controls</span>
+</button>
+
+<aside class="sidebar" id="sidebar" aria-label="Visualization controls">
+  <div class="sb-head">
+    <h2>Controls</h2>
+    <div class="sb-head-actions">
+      <button class="icon-btn" id="sb-reset" title="Reset every control to defaults">
+        <span class="ic">↺</span><span>Reset</span>
+      </button>
+      <button class="icon-btn" id="sb-close" title="Close (or press .)">
+        <span class="ic">✕</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="sb-body">
+
+    <details class="sb-section" open>
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Playback
+      </summary>
+      <div class="sb-body-inner">
+        <div class="pb-row">
+          <button class="btn" id="play-btn" title="Play / pause">▶</button>
+          <button class="btn" id="step-back" title="Step one frame back">◀|</button>
+          <button class="btn" id="step-fwd"  title="Step one frame forward">|▶</button>
+          <select class="btn" id="rate-sel" title="Playback speed">
+            <option value="1">1×</option>
+            <option value="0.5" selected>0.5×</option>
+            <option value="0.25">0.25×</option>
+            <option value="0.1">0.1×</option>
+          </select>
+          <span class="frame-lbl" id="frame-lbl">0 / 105</span>
+        </div>
+        <input type="range" id="scrub" min="0" max="105" step="1" value="0">
+        <div style="font-size:.65rem;color:var(--text-muted);margin-top:6px;">
+          Drag canvas to orbit · scroll to zoom · <kbd>r</kbd> reset view · <kbd>space</kbd> play
+        </div>
+      </div>
+    </details>
+
+    <details class="sb-section" open>
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Point cloud
+        <span class="summary-tag">size · shade · object mask</span>
+      </summary>
+      <div class="sb-body-inner">
+        <div class="fld">
+          <div class="lbl-row"><span>Scene PC point size</span><span class="v" id="pc-size-lbl">3.0</span></div>
+          <input type="range" id="pc-size" min="0.5" max="12" step="0.25" value="3">
+        </div>
+        <div class="fld">
+          <div class="lbl-row"><span title="Higher dims far-away points so foreground reads.">Scene PC depth shade</span><span class="v" id="pc-shade-lbl">0.55</span></div>
+          <input type="range" id="pc-shade" min="0" max="1.5" step="0.05" value="0.55">
+        </div>
+        <div class="fld-grid">
+          <div class="fld">
+            <div class="lbl-row"><span>Scene PC opacity</span><span class="v" id="pc-opacity-lbl">0.95</span></div>
+            <input type="range" id="pc-opacity" min="0.1" max="1" step="0.02" value="0.95">
+          </div>
+          <div class="fld">
+            <div class="lbl-row"><span>Object dot size</span><span class="v" id="obj-size-lbl">7.0</span></div>
+            <input type="range" id="obj-size" min="2" max="22" step="0.5" value="7">
+          </div>
+        </div>
+        <div class="fld">
+          <div class="lbl-row"><span title="Pixel radius around each anchor 2D-track inside which scene-PC points are hidden, so the GT object cloud isn't double-drawn on MoGe-lifted object pixels.">Object mask radius (px)</span><span class="v" id="mask-r-lbl">30</span></div>
+          <input type="range" id="mask-r" min="0" max="120" step="1" value="30">
+        </div>
+        <div class="fld">
+          <div class="lbl-row"><span title="0 = use a hard threshold; >0 softens the mask edge over this pixel range so the cut-out doesn't look quantized.">Mask edge softness (px)</span><span class="v" id="mask-soft-lbl">8</span></div>
+          <input type="range" id="mask-soft" min="0" max="40" step="1" value="8">
+        </div>
+      </div>
+    </details>
+
+    <details class="sb-section" open>
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Trajectory
+        <span class="summary-tag">trail count · length · width</span>
+      </summary>
+      <div class="sb-body-inner">
+        <div class="fld">
+          <div class="lbl-row"><span># trails</span><span class="v" id="n-trails-lbl">32</span></div>
+          <input type="range" id="n-trails" min="0" max="256" step="1" value="32">
+        </div>
+        <div class="fld-grid">
+          <div class="fld">
+            <div class="lbl-row"><span>Trail length (frames)</span><span class="v" id="trail-len-lbl">28</span></div>
+            <input type="range" id="trail-len" min="2" max="105" step="1" value="28">
+          </div>
+          <div class="fld">
+            <div class="lbl-row"><span>Trail line width (px)</span><span class="v" id="trail-w-lbl">2.5</span></div>
+            <input type="range" id="trail-w" min="0.5" max="8" step="0.1" value="2.5">
+          </div>
+          <div class="fld">
+            <div class="lbl-row"><span title="0 = oldest part of trail is white; 1 = no fade.">Gradient floor</span><span class="v" id="mix-lo-lbl">0.18</span></div>
+            <input type="range" id="mix-lo" min="0" max="0.95" step="0.02" value="0.18">
+          </div>
+          <div class="fld">
+            <div class="lbl-row"><span title="<1 boosts saturation of older frames">Gradient curve</span><span class="v" id="t-exp-lbl">1.0</span></div>
+            <input type="range" id="t-exp" min="0.2" max="2" step="0.05" value="1">
+          </div>
+        </div>
+        <div class="color-row">
+          <input type="color" id="col-gt" value="#f0529c" title="Tint applied on top of each trail's per-point sampled RGB. Pull the slider to mix between sampled and the picker.">
+          <span class="cn">GT trail tint <span class="h" id="col-gt-h">#f0529c</span></span>
+          <input type="range" class="alpha" id="alpha-gt-tint" min="0" max="1" step="0.02" value="0">
+          <span class="alpha-lbl" id="alpha-gt-tint-lbl">0.00</span>
+        </div>
+      </div>
+    </details>
+
+    <details class="sb-section" open>
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Camera
+        <span class="summary-tag">trail · marker · viewer</span>
+      </summary>
+      <div class="sb-body-inner">
+        <div class="fld-grid">
+          <div class="fld">
+            <div class="lbl-row"><span>Cam trail width (px)</span><span class="v" id="cam-w-lbl">2.0</span></div>
+            <input type="range" id="cam-w" min="0.5" max="6" step="0.1" value="2">
+          </div>
+          <div class="fld">
+            <div class="lbl-row"><span>Cam marker size</span><span class="v" id="cam-m-lbl">1.0×</span></div>
+            <input type="range" id="cam-m" min="0.2" max="3" step="0.05" value="1">
+          </div>
+        </div>
+        <div class="color-row">
+          <input type="color" id="cam-col-A" value="#34d399" title="clip-001995 portion of the camera trail">
+          <span class="cn">clip-1995 trail <span class="h" id="cam-col-A-h">#34d399</span></span>
+          <input type="range" class="alpha" id="cam-alpha" min="0" max="1" step="0.02" value="0.9">
+          <span class="alpha-lbl" id="cam-alpha-lbl">0.90</span>
+        </div>
+        <div class="color-row">
+          <input type="color" id="cam-col-B" value="#fbbf24" title="clip-001996 portion of the camera trail">
+          <span class="cn">clip-1996 trail <span class="h" id="cam-col-B-h">#fbbf24</span></span>
+        </div>
+        <button class="btn full" style="margin-top:8px;width:100%;" id="reset-view">↻ Reset viewer camera</button>
+      </div>
+    </details>
+
+    <details class="sb-section" open>
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Layers
+        <span class="summary-tag">show / hide</span>
+      </summary>
+      <div class="sb-body-inner">
+        <div class="toggle-grid">
+          <button class="btn on" id="t-scene">scene PC</button>
+          <button class="btn on" id="t-obj">obj cloud</button>
+          <button class="btn on" id="t-trails">trails</button>
+          <button class="btn on" id="t-cam">cam trail</button>
+          <button class="btn on full" id="t-axes">origin axes (anchor cam)</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="sb-section">
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Background
+        <span class="summary-tag">page + panel</span>
+      </summary>
+      <div class="sb-body-inner">
+        <div class="color-row">
+          <input type="color" id="col-panel" value="#555555" title="3D panel background">
+          <span class="cn">Panel bg <span class="h" id="col-panel-h">#555555</span></span>
+        </div>
+        <div class="color-row">
+          <input type="color" id="col-page-top" value="#ffffff">
+          <span class="cn">Page bg (top) <span class="h" id="col-page-top-h">#ffffff</span></span>
+        </div>
+        <div class="color-row">
+          <input type="color" id="col-page-bot" value="#f3f4f6">
+          <span class="cn">Page bg (bottom) <span class="h" id="col-page-bot-h">#f3f4f6</span></span>
+        </div>
+      </div>
+    </details>
+
+    <div class="sb-legend">
+      <div class="legend">
+        <span><span class="sw" style="background:#999;"></span>scene PC (RGB sampled at anchor frame)</span>
+        <span><span class="sw" style="background:#f0529c;"></span>GT object cloud (per-point sampled RGB, fixed across frames)</span>
+        <span><span class="sw line" style="background:#f0529c;"></span>per-trail polyline (gradient: pale = older, vivid = newer)</span>
+        <span><span class="sw line" style="background:#34d399;"></span>camera path · clip-1995</span>
+        <span><span class="sw line" style="background:#fbbf24;"></span>camera path · clip-1996</span>
+      </div>
+    </div>
+
+  </div>
+</aside>
 
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
-const canvas = document.getElementById('canvas');
+// ── Three.js setup ────────────────────────────────────────────────
 const stage  = document.getElementById('stage');
-
-// ---- Three.js setup ----
+const canvas = document.getElementById('canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d0d0d);
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x555555);
 
-const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 50);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.005, 80);
 
-// Anchor frame: X-right, Y-down, Z-forward. We want a viewer
-// where Y is up. Add a parent that rotates Y→up for display purposes only.
+// Anchor-frame coords are X-right, Y-down, Z-forward. Flip Y for orbit ergonomics.
 const root = new THREE.Group();
-root.rotation.x = Math.PI;   // flip Y so y-down → y-up
+root.rotation.x = Math.PI;
 scene.add(root);
 
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.target.set(0, 0, 1.0);
-
-const initialView = () => {
-  // sit slightly behind & above the anchor camera, looking forward
-  camera.position.set(-0.6, -0.3, -0.5);  // negative Y because of root flip → above
-  controls.target.set(0, 0, 1.2);
+function initialView() {
+  camera.position.set(-0.55, -0.30, -0.45);
+  controls.target.set(0, 0, 1.15);
   controls.update();
-};
+}
 initialView();
 
+const RES = new THREE.Vector2();
 function fit() {
   const { clientWidth: w, clientHeight: h } = stage;
   renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  RES.set(w, h);
+  // Notify all LineMaterials of the new viewport (required for thick lines)
+  scene.traverse(o => {
+    if (o.material && o.material.isLineMaterial) o.material.resolution.copy(RES);
+  });
 }
 window.addEventListener('resize', fit);
 
-// ---- Data loading ----
-async function fetchBin(url) {
-  const r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status);
-  return new Float32Array(await r.arrayBuffer());
-}
-async function fetchU8(url) {
-  const r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status);
-  return new Uint8Array(await r.arrayBuffer());
+// ── Round-sprite point shader ─────────────────────────────────────
+function makePointMat({ size = 4, opacity = 1, depthShade = 0,
+                        shadeNear = 0.4, shadeFar = 3.5,
+                        color = 0xffffff, vertexColors = false,
+                        useMaskAttr = false } = {}) {
+  const defines = {};
+  if (vertexColors) defines.USE_COLOR    = '';
+  if (useMaskAttr)  defines.USE_MASKDIST = '';
+  return new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, depthTest: false, defines,
+    uniforms: {
+      uSize:       { value: size },
+      uOpacity:    { value: opacity },
+      uShade:      { value: depthShade },
+      uShadeNear:  { value: shadeNear },
+      uShadeFar:   { value: shadeFar },
+      uColor:      { value: new THREE.Color(color) },
+      uMaskR:      { value: 30 },     // mask radius (px in source image)
+      uMaskSoft:   { value: 8 },      // soft edge (px)
+    },
+    vertexShader: `
+      varying vec3  vColor;
+      varying float vDepth;
+      varying float vAlpha;
+      uniform float uSize;
+      uniform vec3  uColor;
+      uniform float uMaskR;
+      uniform float uMaskSoft;
+      #ifdef USE_COLOR
+        attribute vec3 color;
+      #endif
+      #ifdef USE_MASKDIST
+        attribute float aMaskDist;     // per-pt min pixel distance to nearest 2D-track at anchor
+      #endif
+      void main() {
+        #ifdef USE_COLOR
+          vColor = color;
+        #else
+          vColor = uColor;
+        #endif
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vDepth = max(0.05, -mv.z);
+        float ps = uSize;
+        // Mask: if aMaskDist < radius, hide; smooth edge over [R - soft, R].
+        float a = 1.0;
+        #ifdef USE_MASKDIST
+          a = smoothstep(uMaskR - uMaskSoft, uMaskR, aMaskDist);
+        #endif
+        vAlpha = a;
+        // Hide masked points with size 0 to skip rasterization entirely.
+        if (a < 0.01) ps = 0.0;
+        gl_PointSize = ps;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      varying vec3  vColor;
+      varying float vDepth;
+      varying float vAlpha;
+      uniform float uOpacity;
+      uniform float uShade;
+      uniform float uShadeNear;
+      uniform float uShadeFar;
+      void main() {
+        vec2 uv = gl_PointCoord * 2.0 - 1.0;
+        float r2 = dot(uv, uv);
+        if (r2 > 1.0) discard;
+        float aa = smoothstep(1.0, 0.85, r2);
+        float t = clamp((vDepth - uShadeNear) / (uShadeFar - uShadeNear), 0.0, 1.0);
+        vec3 c = mix(vColor, vec3(1.0), uShade * t);
+        gl_FragColor = vec4(c, uOpacity * vAlpha * aa);
+      }`,
+  });
 }
 
-const meta  = await (await fetch('data/meta.json')).json();
-const sceneArr = await fetchBin('data/scene.bin');   // (n_pts*6,) [xyzrgb]
-const objArr   = await fetchBin('data/obj.bin');     // (F*K*3,)
-const visArr   = await fetchU8('data/vis.bin');      // (F*K,)
-const camArr   = await fetchBin('data/cam.bin');     // (F*3,)
+// ── Data load ─────────────────────────────────────────────────────
+async function fetchBin(url) { const r = await fetch(url); if(!r.ok) throw new Error(url); return new Float32Array(await r.arrayBuffer()); }
+async function fetchU8(url)  { const r = await fetch(url); if(!r.ok) throw new Error(url); return new Uint8Array(await r.arrayBuffer()); }
+
+const meta       = await (await fetch('data/meta.json')).json();
+const sceneArr   = await fetchBin('data/scene.bin');         // (N_s*6,) xyzrgb
+const minDistArr = await fetchBin('data/min_pix_dist.bin'); // (N_s,)
+const objArr     = await fetchBin('data/obj.bin');           // (F*K*3,)
+const visArr     = await fetchU8('data/vis.bin');            // (F*K,)
+const camArr     = await fetchBin('data/cam.bin');           // (F*3,)
+const objColArr  = await fetchBin('data/obj_color.bin');     // (K*3,) [0,1] rgb
 const F = meta.obj.n_frames, K = meta.obj.n_pts;
-console.log('meta', meta);
 
-document.getElementById('ovab').textContent =
-  `MoGe a=${meta.moge.a.toFixed(3)} b=${meta.moge.b.toFixed(3)}m  ` +
-  `resid=${meta.moge.median_resid_mm.toFixed(0)}mm`;
-document.getElementById('ovstats').textContent =
-  `scene: ${meta.scene.n_pts.toLocaleString()} pts · obj: ${K} pts · F=${F}`;
+document.getElementById('meta-block').innerHTML =
+  `<b>${meta.video.clip_A}</b>[${meta.video.frames_A[0]}…${meta.video.frames_A[1]}] → ` +
+  `<b>${meta.video.clip_B}</b>[${meta.video.frames_B[0]}…${meta.video.frames_B[1]}]<br>` +
+  `MoGe a=${meta.moge.a.toFixed(3)} b=${meta.moge.b.toFixed(3)}m · ` +
+  `resid ${meta.moge.median_resid_mm.toFixed(0)}mm · ${meta.scene.n_pts.toLocaleString()} scene · ${K} obj · ${F}f`;
 
-// ---- Static scene cloud ----
+// ── Static scene cloud with masking ───────────────────────────────
+const sceneMat = makePointMat({
+  size: 3, opacity: 0.95, depthShade: 0.55, shadeNear: 0.4, shadeFar: 3.5,
+  vertexColors: true, useMaskAttr: true,
+});
+let sceneObj;
 {
-  const n = sceneArr.length / 6;
-  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    pos[3*i  ] = sceneArr[6*i  ];
+  const N = sceneArr.length / 6;
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    pos[3*i]   = sceneArr[6*i];
     pos[3*i+1] = sceneArr[6*i+1];
     pos[3*i+2] = sceneArr[6*i+2];
-    col[3*i  ] = sceneArr[6*i+3];
+    col[3*i]   = sceneArr[6*i+3];
     col[3*i+1] = sceneArr[6*i+4];
     col[3*i+2] = sceneArr[6*i+5];
   }
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('color',    new THREE.BufferAttribute(col, 3));
-  const m = new THREE.PointsMaterial({ size: 0.0025, vertexColors: true,
-                                       sizeAttenuation: true, depthWrite: false,
-                                       transparent: true, opacity: 0.9 });
-  window._sceneMat = m;
-  root.add(new THREE.Points(g, m));
+  g.setAttribute('position',  new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color',     new THREE.BufferAttribute(col, 3));
+  g.setAttribute('aMaskDist', new THREE.BufferAttribute(minDistArr, 1));
+  sceneObj = new THREE.Points(g, sceneMat);
+  root.add(sceneObj);
 }
 
-// ---- Per-frame object cloud ----
-const objColor = new THREE.Color(meta.color_obj[0]/255, meta.color_obj[1]/255, meta.color_obj[2]/255);
+// ── GT object cloud (current frame, per-point sampled RGB) ────────
+const objMat = makePointMat({
+  size: 7, opacity: 1.0, depthShade: 0.0,
+  vertexColors: true,
+});
+const objPos = new Float32Array(K * 3);
+const objCol = new Float32Array(K * 3);
+for (let k = 0; k < K; k++) {
+  objCol[3*k] = objColArr[3*k];
+  objCol[3*k+1] = objColArr[3*k+1];
+  objCol[3*k+2] = objColArr[3*k+2];
+}
 const objGeom = new THREE.BufferGeometry();
-const objPos  = new Float32Array(K * 3);
 objGeom.setAttribute('position', new THREE.BufferAttribute(objPos, 3).setUsage(THREE.DynamicDrawUsage));
-const objMat  = new THREE.PointsMaterial({ size: 0.006, color: objColor,
-                                            sizeAttenuation: true, depthWrite: false });
-window._objMat = objMat;
-const objPts  = new THREE.Points(objGeom, objMat);
-root.add(objPts);
+objGeom.setAttribute('color',    new THREE.BufferAttribute(objCol, 3));
+const objObj = new THREE.Points(objGeom, objMat);
+root.add(objObj);
+
+// ── Trail subset: pick stable points (high anchor-vis count over time) ──
+const trail_visCount = new Int32Array(K);
+for (let k = 0; k < K; k++) {
+  let c = 0;
+  for (let f = 0; f < F; f++) if (visArr[f * K + k]) c++;
+  trail_visCount[k] = c;
+}
+// rank descending; top 256 (we'll subset further at runtime)
+const trailRank = Array.from({length: K}, (_,i) => i)
+  .sort((a, b) => trail_visCount[b] - trail_visCount[a]);
+
+// Build one Line2 per (potential) trail; pre-allocate full F-length geometries.
+// We toggle visibility + drawRange + color gradient at runtime.
+const TRAIL_MAX = 256;
+const trailGroup = new THREE.Group();
+const trails = [];           // {line, mat, geom, posBuf, colBuf, kIdx}
+for (let i = 0; i < TRAIL_MAX; i++) {
+  const kIdx = trailRank[i];
+  const g = new LineGeometry();
+  // start with a degenerate line; real positions filled in setFrame
+  const dummy = new Float32Array(F * 3);
+  g.setPositions(dummy);
+  const dummyC = new Float32Array(F * 3);
+  g.setColors(dummyC);
+  const mat = new LineMaterial({
+    color: 0xffffff, vertexColors: true,
+    linewidth: 2.5, transparent: true, opacity: 0.95,
+    depthTest: false, depthWrite: false,
+  });
+  mat.resolution.copy(RES);
+  const line = new Line2(g, mat);
+  line.computeLineDistances();
+  line.visible = i < 32;     // default n-trails
+  trailGroup.add(line);
+  trails.push({ line, mat, geom: g, kIdx, posBuf: null, colBuf: null });
+}
+root.add(trailGroup);
+
+// ── Camera trail (Line2, two segments colored per clip) ───────────
+const A_LEN = meta.video.frames_A[1] - meta.video.frames_A[0] + 1;
+const camGroup = new THREE.Group();
+const camLines = { A: null, B: null };
+function buildCamLines() {
+  while (camGroup.children.length) {
+    const c = camGroup.children.pop();
+    c.geometry?.dispose?.();
+    c.material?.dispose?.();
+  }
+  const colA = new THREE.Color(document.getElementById('cam-col-A').value);
+  const colB = new THREE.Color(document.getElementById('cam-col-B').value);
+  const lw   = parseFloat(document.getElementById('cam-w').value);
+  const op   = parseFloat(document.getElementById('cam-alpha').value);
+  // Clip A: indices 0..A_LEN-1
+  const posA = new Float32Array(A_LEN * 3);
+  for (let i = 0; i < A_LEN; i++) {
+    posA[3*i] = camArr[3*i]; posA[3*i+1] = camArr[3*i+1]; posA[3*i+2] = camArr[3*i+2];
+  }
+  const colA_arr = new Float32Array(A_LEN * 3);
+  for (let i = 0; i < A_LEN; i++) { colA_arr[3*i]=colA.r; colA_arr[3*i+1]=colA.g; colA_arr[3*i+2]=colA.b; }
+  const gA = new LineGeometry(); gA.setPositions(posA); gA.setColors(colA_arr);
+  const mA = new LineMaterial({ vertexColors: true, linewidth: lw, transparent: true, opacity: op,
+                                depthTest: false, depthWrite: false });
+  mA.resolution.copy(RES);
+  camLines.A = new Line2(gA, mA); camLines.A.computeLineDistances();
+  camGroup.add(camLines.A);
+
+  // Clip B: indices A_LEN..F-1 (plus we connect to last A pt for continuity)
+  const Bn = F - A_LEN + 1;
+  const posB = new Float32Array(Bn * 3);
+  posB[0] = camArr[3*(A_LEN-1)]; posB[1] = camArr[3*(A_LEN-1)+1]; posB[2] = camArr[3*(A_LEN-1)+2];
+  for (let i = 0; i < F - A_LEN; i++) {
+    posB[3*(i+1)]   = camArr[3*(A_LEN+i)];
+    posB[3*(i+1)+1] = camArr[3*(A_LEN+i)+1];
+    posB[3*(i+1)+2] = camArr[3*(A_LEN+i)+2];
+  }
+  const colB_arr = new Float32Array(Bn * 3);
+  for (let i = 0; i < Bn; i++) { colB_arr[3*i]=colB.r; colB_arr[3*i+1]=colB.g; colB_arr[3*i+2]=colB.b; }
+  const gB = new LineGeometry(); gB.setPositions(posB); gB.setColors(colB_arr);
+  const mB = new LineMaterial({ vertexColors: true, linewidth: lw, transparent: true, opacity: op,
+                                depthTest: false, depthWrite: false });
+  mB.resolution.copy(RES);
+  camLines.B = new Line2(gB, mB); camLines.B.computeLineDistances();
+  camGroup.add(camLines.B);
+}
+buildCamLines();
+root.add(camGroup);
+
+// Cam current-frame marker
+const camMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.012, 16, 16),
+  new THREE.MeshBasicMaterial({ color: 0x0f172a, depthTest: false }));
+camMarker.renderOrder = 4;
+root.add(camMarker);
+const CAM_MARKER_BASE_R = 0.012;
+function setCamMarkerScale(s) {
+  camMarker.scale.setScalar(s);
+}
+
+// Origin axes
+const axes = new THREE.AxesHelper(0.07);
+axes.material.depthTest = false;
+root.add(axes);
+
+// ── Trail rebuild (call when N_trails / colors / gradient change) ──
+let nTrails    = 32;
+let trailLen   = 28;
+let trailW     = 2.5;
+let mixLo      = 0.18;
+let tExp       = 1.0;
+let gtTintCol  = new THREE.Color('#f0529c');
+let gtTintAlpha = 0.0;
+
+function rebuildTrailsBaseColors() {
+  // Per-trail base color = sampled obj_color, optionally tinted toward gtTintCol.
+  for (let i = 0; i < TRAIL_MAX; i++) {
+    if (i >= nTrails) { trails[i].line.visible = false; continue; }
+    trails[i].line.visible = true;
+    const t = trails[i];
+    const k = t.kIdx;
+    let r = objColArr[3*k], g = objColArr[3*k+1], b = objColArr[3*k+2];
+    // mix toward tint
+    r = (1 - gtTintAlpha) * r + gtTintAlpha * gtTintCol.r;
+    g = (1 - gtTintAlpha) * g + gtTintAlpha * gtTintCol.g;
+    b = (1 - gtTintAlpha) * b + gtTintAlpha * gtTintCol.b;
+    t.baseR = r; t.baseG = g; t.baseB = b;
+    t.mat.linewidth = trailW;
+  }
+}
+rebuildTrailsBaseColors();
 
 function setFrame(fi) {
+  // Update GT object cloud
   const off = fi * K;
-  let written = 0;
   for (let k = 0; k < K; k++) {
     if (visArr[off + k]) {
       const src = (off + k) * 3;
-      objPos[3*written  ] = objArr[src    ];
-      objPos[3*written+1] = objArr[src + 1];
-      objPos[3*written+2] = objArr[src + 2];
-      written++;
+      objPos[3*k]   = objArr[src];
+      objPos[3*k+1] = objArr[src + 1];
+      objPos[3*k+2] = objArr[src + 2];
+    } else {
+      objPos[3*k] = NaN; objPos[3*k+1] = NaN; objPos[3*k+2] = NaN;
     }
   }
-  // shrink un-rendered slots to a tiny point at origin
-  for (let k = written; k < K; k++) {
-    objPos[3*k] = NaN; objPos[3*k+1] = NaN; objPos[3*k+2] = NaN;
-  }
   objGeom.attributes.position.needsUpdate = true;
-  objGeom.setDrawRange(0, K);
 
-  // current camera marker
-  cameraMarker.position.set(camArr[3*fi], camArr[3*fi+1], camArr[3*fi+2]);
+  // Update trail polylines
+  const tailStart = Math.max(0, fi - trailLen);
+  for (let i = 0; i < nTrails; i++) {
+    const t = trails[i];
+    const k = t.kIdx;
+    // Build positions array: [tailStart..fi]; we always pass F vertices but
+    // setDrawRange isn't on Line2 — easier to rebuild positions every tick
+    // for the ones we actually render. F is small (≤106) so this is fine.
+    const N = (fi - tailStart + 1);
+    if (N < 2) { t.line.visible = false; continue; }
+    t.line.visible = true;
+    const pos = new Float32Array(N * 3);
+    const col = new Float32Array(N * 3);
+    let lastValid = null;
+    for (let j = 0; j < N; j++) {
+      const fj = tailStart + j;
+      const src = (fj * K + k) * 3;
+      const vis = visArr[fj * K + k];
+      if (vis) {
+        pos[3*j]   = objArr[src];
+        pos[3*j+1] = objArr[src + 1];
+        pos[3*j+2] = objArr[src + 2];
+        lastValid = [pos[3*j], pos[3*j+1], pos[3*j+2]];
+      } else if (lastValid) {
+        // Gap-fill so the line doesn't fly to origin; visible mass stays put.
+        pos[3*j]   = lastValid[0];
+        pos[3*j+1] = lastValid[1];
+        pos[3*j+2] = lastValid[2];
+      } else {
+        pos[3*j] = pos[3*j+1] = pos[3*j+2] = 0;
+      }
+      // Temporal gradient: oldest = pale (mixed toward white), newest = vivid.
+      const tt = N === 1 ? 1 : (j / (N - 1));
+      const k2 = mixLo + (1 - mixLo) * Math.pow(tt, tExp);
+      const r = (1 - k2) + k2 * t.baseR;
+      const g = (1 - k2) + k2 * t.baseG;
+      const b = (1 - k2) + k2 * t.baseB;
+      col[3*j] = r; col[3*j+1] = g; col[3*j+2] = b;
+    }
+    // LineGeometry expects fresh setPositions/setColors each call.
+    t.geom.setPositions(pos);
+    t.geom.setColors(col);
+    // computeLineDistances only needed for dashed lines; skipping for perf.
+  }
+  // Hide extra trails
+  for (let i = nTrails; i < TRAIL_MAX; i++) trails[i].line.visible = false;
 
-  // overlay
-  const inA = fi <= (meta.video.frames_A[1] - meta.video.frames_A[0]);
-  const t = inA
-    ? meta.video.frames_A[0] + fi
-    : meta.video.frames_B[0] + (fi - (meta.video.frames_A[1] - meta.video.frames_A[0]) - 1);
+  // Camera marker
+  camMarker.position.set(camArr[3*fi], camArr[3*fi+1], camArr[3*fi+2]);
+
+  // Overlay
+  const inA = fi < A_LEN;
+  const t = inA ? meta.video.frames_A[0] + fi
+                : meta.video.frames_B[0] + (fi - A_LEN);
   const clip = inA ? meta.video.clip_A : meta.video.clip_B;
   document.getElementById('ovframe').textContent = `frame ${fi} / ${F-1}`;
-  document.getElementById('ovsrc').innerHTML =
-    `${clip} t=${t}` + (inA ? '' : '  <span style="color:#d97a3c">(crossed clip boundary)</span>');
-  posEl.textContent = `${fi} / ${F-1}`;
-  posEl.classList.toggle('boundary', !inA);
-  slider.value = fi;
+  const boundary = inA ? '' : ' <span class="boundary">(crossed clip boundary)</span>';
+  document.getElementById('ovsrc').innerHTML = `${clip} t=${t}${boundary}`;
+  document.getElementById('frame-lbl').textContent = `${fi} / ${F-1}`;
 }
 
-// ---- Camera trail (line + dot) ----
-{
-  const pts = [];
-  for (let i = 0; i < F; i++) pts.push(new THREE.Vector3(camArr[3*i], camArr[3*i+1], camArr[3*i+2]));
-  const lg = new THREE.BufferGeometry().setFromPoints(pts);
-  // color the trail: clip A red-ish, clip B amber-ish
-  const A_len = meta.video.frames_A[1] - meta.video.frames_A[0] + 1;
-  const cols = new Float32Array(F * 3);
-  for (let i = 0; i < F; i++) {
-    const c = (i < A_len) ? [0.85, 0.40, 0.30] : [0.95, 0.65, 0.20];
-    cols[3*i] = c[0]; cols[3*i+1] = c[1]; cols[3*i+2] = c[2];
-  }
-  lg.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-  const lm = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2 });
-  root.add(new THREE.Line(lg, lm));
+// ── UI wiring ─────────────────────────────────────────────────────
+function bind(id, cb, kind = 'input') {
+  const el = document.getElementById(id);
+  el.addEventListener(kind, () => cb(el.value, el));
 }
+function setLbl(id, v) { document.getElementById(id).textContent = v; }
 
-const cameraMarker = new THREE.Mesh(
-  new THREE.SphereGeometry(0.012, 12, 12),
-  new THREE.MeshBasicMaterial({ color: 0xffd166 }));
-root.add(cameraMarker);
+const scrub = document.getElementById('scrub'); scrub.max = F - 1;
+let frame = 0; let playing = false; let lastTick = 0; let rate = 0.5;
 
-// origin axes (anchor camera)
-{
-  const ax = new THREE.AxesHelper(0.10);
-  root.add(ax);
-}
-
-// ---- UI ----
-const slider = document.getElementById('slider');
-const posEl  = document.getElementById('pos');
-const playB  = document.getElementById('play');
-const resetB = document.getElementById('reset');
-slider.max = F - 1;
-
-let frame = 0;
-let playing = false;
-let lastTick = 0;
-
-function step(d) { frame = (frame + d + F) % F; setFrame(frame); }
-
-slider.addEventListener('input', () => { frame = parseInt(slider.value, 10); setFrame(frame); });
-playB.addEventListener('click', () => {
-  playing = !playing; playB.textContent = playing ? '⏸ pause' : '⏵ play';
+scrub.addEventListener('input', () => { frame = parseInt(scrub.value, 10); setFrame(frame); });
+document.getElementById('play-btn').addEventListener('click', () => {
+  playing = !playing;
+  document.getElementById('play-btn').textContent = playing ? '⏸' : '▶';
+  document.getElementById('play-btn').classList.toggle('on', playing);
   if (playing) lastTick = performance.now();
 });
-resetB.addEventListener('click', initialView);
-document.addEventListener('keydown', e => {
-  if (e.key === ' ')          { playB.click(); e.preventDefault(); }
-  if (e.key === 'ArrowRight') { step(+1); e.preventDefault(); }
-  if (e.key === 'ArrowLeft')  { step(-1); e.preventDefault(); }
-  if (e.key === 'r')          { initialView(); }
+document.getElementById('step-back').addEventListener('click', () => { frame = Math.max(0, frame - 1); setFrame(frame); scrub.value = frame; });
+document.getElementById('step-fwd' ).addEventListener('click', () => { frame = Math.min(F - 1, frame + 1); setFrame(frame); scrub.value = frame; });
+document.getElementById('rate-sel').addEventListener('change', e => { rate = parseFloat(e.target.value); });
+
+// Point cloud sliders
+bind('pc-size',     v => { sceneMat.uniforms.uSize.value     = parseFloat(v); setLbl('pc-size-lbl', parseFloat(v).toFixed(1)); });
+bind('pc-shade',    v => { sceneMat.uniforms.uShade.value    = parseFloat(v); setLbl('pc-shade-lbl', parseFloat(v).toFixed(2)); });
+bind('pc-opacity',  v => { sceneMat.uniforms.uOpacity.value  = parseFloat(v); setLbl('pc-opacity-lbl', parseFloat(v).toFixed(2)); });
+bind('obj-size',    v => { objMat.uniforms.uSize.value       = parseFloat(v); setLbl('obj-size-lbl', parseFloat(v).toFixed(1)); });
+bind('mask-r',      v => { sceneMat.uniforms.uMaskR.value    = parseFloat(v); setLbl('mask-r-lbl', v); });
+bind('mask-soft',   v => { sceneMat.uniforms.uMaskSoft.value = parseFloat(v); setLbl('mask-soft-lbl', v); });
+
+// Trajectory sliders
+bind('n-trails',    v => { nTrails = parseInt(v, 10); setLbl('n-trails-lbl', v); rebuildTrailsBaseColors(); setFrame(frame); });
+bind('trail-len',   v => { trailLen = parseInt(v, 10); setLbl('trail-len-lbl', v); setFrame(frame); });
+bind('trail-w',     v => { trailW = parseFloat(v); setLbl('trail-w-lbl', parseFloat(v).toFixed(1));
+                            for (const t of trails) t.mat.linewidth = trailW; });
+bind('mix-lo',      v => { mixLo = parseFloat(v); setLbl('mix-lo-lbl', parseFloat(v).toFixed(2)); setFrame(frame); });
+bind('t-exp',       v => { tExp  = parseFloat(v); setLbl('t-exp-lbl', parseFloat(v).toFixed(2)); setFrame(frame); });
+bind('col-gt',      v => { document.getElementById('col-gt-h').textContent = v; gtTintCol.set(v); rebuildTrailsBaseColors(); setFrame(frame); }, 'input');
+bind('alpha-gt-tint', v => { gtTintAlpha = parseFloat(v); setLbl('alpha-gt-tint-lbl', parseFloat(v).toFixed(2)); rebuildTrailsBaseColors(); setFrame(frame); });
+
+// Camera sliders
+bind('cam-w',       v => { setLbl('cam-w-lbl', parseFloat(v).toFixed(1)); buildCamLines(); }, 'input');
+bind('cam-m',       v => { setLbl('cam-m-lbl', parseFloat(v).toFixed(2) + '×'); setCamMarkerScale(parseFloat(v)); });
+bind('cam-col-A',   v => { document.getElementById('cam-col-A-h').textContent = v; buildCamLines(); }, 'input');
+bind('cam-col-B',   v => { document.getElementById('cam-col-B-h').textContent = v; buildCamLines(); }, 'input');
+bind('cam-alpha',   v => { setLbl('cam-alpha-lbl', parseFloat(v).toFixed(2)); buildCamLines(); });
+
+document.getElementById('reset-view').addEventListener('click', initialView);
+
+// Layer toggles
+function toggleBtn(id, target) {
+  const el = document.getElementById(id);
+  el.addEventListener('click', () => {
+    el.classList.toggle('on');
+    target.visible = el.classList.contains('on');
+  });
+}
+toggleBtn('t-scene',  sceneObj);
+toggleBtn('t-obj',    objObj);
+toggleBtn('t-trails', trailGroup);
+toggleBtn('t-cam',    camGroup);
+toggleBtn('t-axes',   axes);
+
+// Background
+function syncBg() {
+  const top = document.getElementById('col-page-top').value;
+  const bot = document.getElementById('col-page-bot').value;
+  const pnl = document.getElementById('col-panel').value;
+  document.documentElement.style.setProperty('--page-bg-top', top);
+  document.documentElement.style.setProperty('--page-bg-bottom', bot);
+  document.body.style.background = `linear-gradient(180deg, ${top} 0%, ${bot} 100%)`;
+  scene.background = new THREE.Color(pnl);
+  document.getElementById('col-page-top-h').textContent = top;
+  document.getElementById('col-page-bot-h').textContent = bot;
+  document.getElementById('col-panel-h'   ).textContent = pnl;
+}
+['col-page-top', 'col-page-bot', 'col-panel'].forEach(id =>
+  document.getElementById(id).addEventListener('input', syncBg));
+
+// Sidebar open/close
+const sidebar  = document.getElementById('sidebar');
+const sbHandle = document.getElementById('sb-handle');
+function openSb()  { sidebar.classList.add('open'); document.body.classList.add('sb-open'); sbHandle.classList.add('hidden'); fit(); }
+function closeSb() { sidebar.classList.remove('open'); document.body.classList.remove('sb-open'); sbHandle.classList.remove('hidden'); fit(); }
+document.getElementById('open-sb').addEventListener('click', openSb);
+sbHandle.addEventListener('click', openSb);
+document.getElementById('sb-close').addEventListener('click', closeSb);
+
+// Reset all controls
+document.getElementById('sb-reset').addEventListener('click', () => {
+  const defaults = {
+    'pc-size': 3, 'pc-shade': 0.55, 'pc-opacity': 0.95,
+    'obj-size': 7, 'mask-r': 30, 'mask-soft': 8,
+    'n-trails': 32, 'trail-len': 28, 'trail-w': 2.5,
+    'mix-lo': 0.18, 't-exp': 1.0,
+    'alpha-gt-tint': 0,
+    'cam-w': 2, 'cam-m': 1, 'cam-alpha': 0.9,
+  };
+  for (const [id, v] of Object.entries(defaults)) {
+    const el = document.getElementById(id);
+    el.value = v; el.dispatchEvent(new Event('input'));
+  }
 });
 
-document.getElementById('size_scene').addEventListener('input', e =>
-  window._sceneMat.size = parseFloat(e.target.value) * 0.001);
-document.getElementById('size_obj').addEventListener('input', e =>
-  window._objMat.size = parseFloat(e.target.value) * 0.001);
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+  if (e.key === ' ')          { document.getElementById('play-btn').click(); e.preventDefault(); }
+  if (e.key === 'ArrowRight') { document.getElementById('step-fwd').click(); e.preventDefault(); }
+  if (e.key === 'ArrowLeft')  { document.getElementById('step-back').click(); e.preventDefault(); }
+  if (e.key === 'r')          { initialView(); }
+  if (e.key === '.')          { sidebar.classList.contains('open') ? closeSb() : openSb(); }
+});
 
-// theme
-const themeBtn = document.getElementById('theme');
-function setTheme(t) {
-  document.documentElement.dataset.theme = t;
-  themeBtn.textContent = t === 'dark' ? 'light' : 'dark';
-  localStorage.setItem('hot3d_visex_theme', t);
-  scene.background = new THREE.Color(t === 'dark' ? 0x0d0d0d : 0xeeece5);
-}
-setTheme(localStorage.getItem('hot3d_visex_theme') || 'dark');
-themeBtn.addEventListener('click', () =>
-  setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
-
-setFrame(0);
-fit();
-
-// ---- Render loop ----
+// Render loop
 const FPS = 30;
 function tick(now) {
   if (playing) {
-    if (now - lastTick > 1000 / FPS) {
-      step(+1);
+    const interval = 1000 / (FPS * rate);
+    if (now - lastTick > interval) {
+      frame = (frame + 1) % F;
+      setFrame(frame); scrub.value = frame;
       lastTick = now;
     }
   }
@@ -330,6 +965,8 @@ function tick(now) {
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
+fit();
+setFrame(0);
 requestAnimationFrame(tick);
 </script>
 </body>

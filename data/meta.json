@@ -28,18 +28,16 @@
     "b": 0.341836220185801,
     "median_resid_mm": 28.151158123823073,
     "mean_resid_mm": 34.77371582640697,
-    "n_anchor_pts": 8398
+    "n_anchor_pts": 8398,
+    "obj_mask_radius_px_default": 10,
+    "track_pix_count": 8398
   },
   "scene": {
     "n_pts": 120000
   },
   "obj": {
     "n_frames": 106,
-    "n_pts": 2000
-  },
-  "color_obj": [
-    51,
-    153,
-    204
-  ]
+    "n_pts": 2000,
+    "color_source": "anchor_rgb_bilinear_at_2d_track"
+  }
 }
