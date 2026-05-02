@@ -495,76 +495,61 @@ function fit() {
 }
 window.addEventListener('resize', fit);
 
-// ── Round-sprite point shader ─────────────────────────────────────
-function makePointMat({ size = 4, opacity = 1, depthShade = 0,
+// ── Round-sprite point shader (motion-teaser style: opaque hard discard) ──
+// One shader, one set of uniforms; the mask is gated by `uMaskOn`.
+// `aMaskDist` and `color` are declared unconditionally — if the geometry
+// doesn't supply them, WebGL gives default values (0 / vec3(0)) and the
+// shader uses uniforms instead.
+function makePointMat({ size = 4, depthShade = 0,
                         shadeNear = 0.4, shadeFar = 3.5,
-                        color = 0xffffff, vertexColors = false,
-                        useMaskAttr = false, depthTest = true } = {}) {
-  const defines = {};
-  if (vertexColors) defines.USE_COLOR    = '';
-  if (useMaskAttr)  defines.USE_MASKDIST = '';
+                        color = 0xffffff, useColorAttr = false,
+                        useMaskAttr = false,
+                        depthTest = true, depthWrite = true } = {}) {
   return new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, depthTest, defines,
+    transparent: false, depthTest, depthWrite,
     uniforms: {
-      uSize:       { value: size },
-      uOpacity:    { value: opacity },
-      uShade:      { value: depthShade },
-      uShadeNear:  { value: shadeNear },
-      uShadeFar:   { value: shadeFar },
-      uColor:      { value: new THREE.Color(color) },
-      uMaskR:      { value: 30 },     // mask radius (px in source image)
-      uMaskSoft:   { value: 8 },      // soft edge (px)
+      uSize:      { value: size },
+      uShade:     { value: depthShade },
+      uShadeNear: { value: shadeNear },
+      uShadeFar:  { value: shadeFar },
+      uColor:     { value: new THREE.Color(color) },
+      uHasColor:  { value: useColorAttr ? 1 : 0 },
+      uMaskOn:    { value: useMaskAttr ? 1 : 0 },
+      uMaskR:     { value: 30 },
+      uMaskSoft:  { value: 8 },
     },
     vertexShader: `
+      attribute vec3  color;
+      attribute float aMaskDist;
       varying vec3  vColor;
       varying float vDepth;
-      varying float vAlpha;
       uniform float uSize;
       uniform vec3  uColor;
+      uniform float uHasColor;
+      uniform float uMaskOn;
       uniform float uMaskR;
       uniform float uMaskSoft;
-      #ifdef USE_COLOR
-        attribute vec3 color;
-      #endif
-      #ifdef USE_MASKDIST
-        attribute float aMaskDist;     // per-pt min pixel distance to nearest 2D-track at anchor
-      #endif
       void main() {
-        #ifdef USE_COLOR
-          vColor = color;
-        #else
-          vColor = uColor;
-        #endif
+        vColor = mix(uColor, color, uHasColor);
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vDepth = max(0.05, -mv.z);
         float ps = uSize;
-        // Mask: if aMaskDist < radius, hide; smooth edge over [R - soft, R].
-        float a = 1.0;
-        #ifdef USE_MASKDIST
-          a = smoothstep(uMaskR - uMaskSoft, uMaskR, aMaskDist);
-        #endif
-        vAlpha = a;
-        // Hide masked points with size 0 to skip rasterization entirely.
-        if (a < 0.01) ps = 0.0;
+        if (uMaskOn > 0.5 && aMaskDist < uMaskR) ps = 0.0;
         gl_PointSize = ps;
-        gl_Position = projectionMatrix * mv;
+        gl_Position  = projectionMatrix * mv;
       }`,
     fragmentShader: `
       varying vec3  vColor;
       varying float vDepth;
-      varying float vAlpha;
-      uniform float uOpacity;
       uniform float uShade;
       uniform float uShadeNear;
       uniform float uShadeFar;
       void main() {
         vec2 uv = gl_PointCoord * 2.0 - 1.0;
-        float r2 = dot(uv, uv);
-        if (r2 > 1.0) discard;
-        float aa = smoothstep(1.0, 0.85, r2);
+        if (dot(uv, uv) > 1.0) discard;
         float t = clamp((vDepth - uShadeNear) / (uShadeFar - uShadeNear), 0.0, 1.0);
         vec3 c = mix(vColor, vec3(1.0), uShade * t);
-        gl_FragColor = vec4(c, uOpacity * vAlpha * aa);
+        gl_FragColor = vec4(c, 1.0);
       }`,
   });
 }
@@ -590,8 +575,8 @@ document.getElementById('meta-block').innerHTML =
 
 // ── Static scene cloud with masking ───────────────────────────────
 const sceneMat = makePointMat({
-  size: 3, opacity: 0.95, depthShade: 0.55, shadeNear: 0.4, shadeFar: 3.5,
-  vertexColors: true, useMaskAttr: true,
+  size: 3, depthShade: 0.55, shadeNear: 0.4, shadeFar: 3.5,
+  useColorAttr: true, useMaskAttr: true,
 });
 let sceneObj;
 {
@@ -615,8 +600,8 @@ let sceneObj;
 
 // ── GT object cloud (current frame, per-point sampled RGB) ────────
 const objMat = makePointMat({
-  size: 7, opacity: 1.0, depthShade: 0.0,
-  vertexColors: true, depthTest: false,
+  size: 7, depthShade: 0.0,
+  useColorAttr: true, depthTest: false, depthWrite: false,
 });
 const objPos = new Float32Array(K * 3);
 const objCol = new Float32Array(K * 3);
@@ -859,12 +844,14 @@ document.getElementById('step-fwd' ).addEventListener('click', () => { frame = M
 document.getElementById('rate-sel').addEventListener('change', e => { rate = parseFloat(e.target.value); });
 
 // Point cloud sliders
-bind('pc-size',     v => { sceneMat.uniforms.uSize.value     = parseFloat(v); setLbl('pc-size-lbl', parseFloat(v).toFixed(1)); });
-bind('pc-shade',    v => { sceneMat.uniforms.uShade.value    = parseFloat(v); setLbl('pc-shade-lbl', parseFloat(v).toFixed(2)); });
-bind('pc-opacity',  v => { sceneMat.uniforms.uOpacity.value  = parseFloat(v); setLbl('pc-opacity-lbl', parseFloat(v).toFixed(2)); });
-bind('obj-size',    v => { objMat.uniforms.uSize.value       = parseFloat(v); setLbl('obj-size-lbl', parseFloat(v).toFixed(1)); });
-bind('mask-r',      v => { sceneMat.uniforms.uMaskR.value    = parseFloat(v); setLbl('mask-r-lbl', v); });
-bind('mask-soft',   v => { sceneMat.uniforms.uMaskSoft.value = parseFloat(v); setLbl('mask-soft-lbl', v); });
+bind('pc-size',     v => { sceneMat.uniforms.uSize.value  = parseFloat(v); setLbl('pc-size-lbl', parseFloat(v).toFixed(1)); });
+bind('pc-shade',    v => { sceneMat.uniforms.uShade.value = parseFloat(v); setLbl('pc-shade-lbl', parseFloat(v).toFixed(2)); });
+bind('obj-size',    v => { objMat.uniforms.uSize.value    = parseFloat(v); setLbl('obj-size-lbl', parseFloat(v).toFixed(1)); });
+bind('mask-r',      v => { sceneMat.uniforms.uMaskR.value = parseFloat(v); setLbl('mask-r-lbl', v); });
+// pc-opacity / mask-soft sliders kept for layout but no-op in the opaque
+// shader path; if you re-enable a soft edge later, flip transparent on.
+bind('pc-opacity',  v => { setLbl('pc-opacity-lbl', parseFloat(v).toFixed(2)); });
+bind('mask-soft',   v => { setLbl('mask-soft-lbl', v); });
 
 // Trajectory sliders
 bind('n-trails',    v => { nTrails = parseInt(v, 10); setLbl('n-trails-lbl', v); rebuildTrailsBaseColors(); setFrame(frame); });
