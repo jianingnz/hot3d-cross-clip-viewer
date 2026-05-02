@@ -290,43 +290,44 @@ kbd {
           <span class="frame-lbl" id="frame-lbl">0 / 105</span>
         </div>
         <input type="range" id="scrub" min="0" max="105" step="1" value="0">
-        <div style="font-size:.65rem;color:var(--text-muted);margin-top:6px;">
-          Drag canvas to orbit · scroll to zoom · <kbd>r</kbd> reset view · <kbd>space</kbd> play
+        <div style="font-size:.65rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">
+          Drag canvas to orbit · scroll to zoom<br>
+          <kbd>WASD</kbd> pan · <kbd>E</kbd>/<kbd>C</kbd> up/down · <kbd>Q</kbd>/<kbd>Z</kbd> rotate yaw<br>
+          <kbd>r</kbd> reset · <kbd>space</kbd> play · <kbd>←</kbd>/<kbd>→</kbd> step · <kbd>.</kbd> sidebar
         </div>
       </div>
     </details>
 
     <details class="sb-section" open>
       <summary>
-        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Point cloud
-        <span class="summary-tag">size · shade · object mask</span>
+        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Scene cloud
+        <span class="summary-tag">size · mask · depth crop</span>
       </summary>
       <div class="sb-body-inner">
         <div class="fld">
-          <div class="lbl-row"><span>Scene PC point size</span><span class="v" id="pc-size-lbl">3.0</span></div>
+          <div class="lbl-row"><span>Point size</span><span class="v" id="pc-size-lbl">3.0</span></div>
           <input type="range" id="pc-size" min="0.5" max="12" step="0.25" value="3">
         </div>
         <div class="fld">
-          <div class="lbl-row"><span title="Higher dims far-away points so foreground reads.">Scene PC depth shade</span><span class="v" id="pc-shade-lbl">0.55</span></div>
-          <input type="range" id="pc-shade" min="0" max="1.5" step="0.05" value="0.55">
-        </div>
-        <div class="fld-grid">
-          <div class="fld">
-            <div class="lbl-row"><span>Scene PC opacity</span><span class="v" id="pc-opacity-lbl">0.95</span></div>
-            <input type="range" id="pc-opacity" min="0.1" max="1" step="0.02" value="0.95">
-          </div>
-          <div class="fld">
-            <div class="lbl-row"><span>Object dot size</span><span class="v" id="obj-size-lbl">7.0</span></div>
-            <input type="range" id="obj-size" min="2" max="22" step="0.5" value="7">
-          </div>
-        </div>
-        <div class="fld">
-          <div class="lbl-row"><span title="Pixel radius around each anchor 2D-track inside which scene-PC points are hidden, so the GT object cloud isn't double-drawn on MoGe-lifted object pixels.">Object mask radius (px)</span><span class="v" id="mask-r-lbl">30</span></div>
+          <div class="lbl-row"><span title="Pixel radius around each anchor 2D-track inside which scene points are hidden — keeps the GT object cloud the only foreground representation.">Object mask radius (px)</span><span class="v" id="mask-r-lbl">30</span></div>
           <input type="range" id="mask-r" min="0" max="120" step="1" value="30">
         </div>
         <div class="fld">
-          <div class="lbl-row"><span title="0 = use a hard threshold; >0 softens the mask edge over this pixel range so the cut-out doesn't look quantized.">Mask edge softness (px)</span><span class="v" id="mask-soft-lbl">8</span></div>
-          <input type="range" id="mask-soft" min="0" max="40" step="1" value="8">
+          <div class="lbl-row"><span title="Hide points farther than this from the anchor camera. Drop to ~1.0–1.5 m to keep only the table-top.">Max depth (m)</span><span class="v" id="zmax-lbl">1.20</span></div>
+          <input type="range" id="zmax" min="0.30" max="5.00" step="0.05" value="1.20">
+        </div>
+      </div>
+    </details>
+
+    <details class="sb-section" open>
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Object cloud
+        <span class="summary-tag">size</span>
+      </summary>
+      <div class="sb-body-inner">
+        <div class="fld">
+          <div class="lbl-row"><span>Object dot size</span><span class="v" id="obj-size-lbl">7.0</span></div>
+          <input type="range" id="obj-size" min="2" max="22" step="0.5" value="7">
         </div>
       </div>
     </details>
@@ -334,34 +335,36 @@ kbd {
     <details class="sb-section" open>
       <summary>
         <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Trajectory
-        <span class="summary-tag">trail count · length · width</span>
+        <span class="summary-tag">count · length · width · smoothness · color</span>
       </summary>
       <div class="sb-body-inner">
         <div class="fld">
           <div class="lbl-row"><span># trails</span><span class="v" id="n-trails-lbl">32</span></div>
           <input type="range" id="n-trails" min="0" max="256" step="1" value="32">
         </div>
-        <div class="fld-grid">
-          <div class="fld">
-            <div class="lbl-row"><span>Trail length (frames)</span><span class="v" id="trail-len-lbl">28</span></div>
-            <input type="range" id="trail-len" min="2" max="105" step="1" value="28">
-          </div>
-          <div class="fld">
-            <div class="lbl-row"><span>Trail line width (px)</span><span class="v" id="trail-w-lbl">2.5</span></div>
-            <input type="range" id="trail-w" min="0.5" max="8" step="0.1" value="2.5">
-          </div>
-          <div class="fld">
-            <div class="lbl-row"><span title="0 = oldest part of trail is white; 1 = no fade.">Gradient floor</span><span class="v" id="mix-lo-lbl">0.18</span></div>
-            <input type="range" id="mix-lo" min="0" max="0.95" step="0.02" value="0.18">
-          </div>
-          <div class="fld">
-            <div class="lbl-row"><span title="<1 boosts saturation of older frames">Gradient curve</span><span class="v" id="t-exp-lbl">1.0</span></div>
-            <input type="range" id="t-exp" min="0.2" max="2" step="0.05" value="1">
-          </div>
+        <div class="fld">
+          <div class="lbl-row"><span>Trail length (frames)</span><span class="v" id="trail-len-lbl">28</span></div>
+          <input type="range" id="trail-len" min="2" max="105" step="1" value="28">
+        </div>
+        <div class="fld">
+          <div class="lbl-row"><span>Trail line width (px)</span><span class="v" id="trail-w-lbl">2.5</span></div>
+          <input type="range" id="trail-w" min="0.5" max="8" step="0.1" value="2.5">
+        </div>
+        <div class="fld">
+          <div class="lbl-row"><span title="Catmull-Rom samples per inter-frame interval. 1 = polyline through raw frames; higher = smoother curves.">Trail smoothness</span><span class="v" id="trail-smooth-lbl">1</span></div>
+          <input type="range" id="trail-smooth" min="1" max="12" step="1" value="1">
+        </div>
+        <div class="fld">
+          <div class="lbl-row"><span title="0 = oldest part of trail fades to white; 1 = no fade.">Gradient floor</span><span class="v" id="mix-lo-lbl">0.18</span></div>
+          <input type="range" id="mix-lo" min="0" max="0.95" step="0.02" value="0.18">
+        </div>
+        <div class="fld">
+          <div class="lbl-row"><span title="<1 boosts saturation of older frames">Gradient curve</span><span class="v" id="t-exp-lbl">1.0</span></div>
+          <input type="range" id="t-exp" min="0.2" max="2" step="0.05" value="1">
         </div>
         <div class="color-row">
-          <input type="color" id="col-gt" value="#f0529c" title="Tint applied on top of each trail's per-point sampled RGB. Pull the slider to mix between sampled and the picker.">
-          <span class="cn">GT trail tint <span class="h" id="col-gt-h">#f0529c</span></span>
+          <input type="color" id="col-gt" value="#f0529c" title="Tint blended on top of each trail's per-point sampled RGB. With the slider at 0 = trails use sampled color; at 1 = trails use the picker color uniformly.">
+          <span class="cn">Trail color <span class="h" id="col-gt-h">#f0529c</span></span>
           <input type="range" class="alpha" id="alpha-gt-tint" min="0" max="1" step="0.02" value="0">
           <span class="alpha-lbl" id="alpha-gt-tint-lbl">0.00</span>
         </div>
@@ -414,7 +417,7 @@ kbd {
       </div>
     </details>
 
-    <details class="sb-section">
+    <details class="sb-section" open>
       <summary>
         <svg class="chev" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l6 5-6 5V3z"/></svg> Background
         <span class="summary-tag">page + panel</span>
@@ -563,18 +566,20 @@ sceneObj.frustumCulled = false;
 root.add(sceneObj);
 
 let maskRadius = 30;
+let zMax = 1.20;
 function rebuildScene() {
   let n = 0;
   for (let i = 0; i < N_SCENE; i++) {
-    if (minDistArr[i] >= maskRadius) {
-      scenePos[3*n]   = sceneAllPos[3*i];
-      scenePos[3*n+1] = sceneAllPos[3*i+1];
-      scenePos[3*n+2] = sceneAllPos[3*i+2];
-      sceneCol[3*n]   = sceneAllCol[3*i];
-      sceneCol[3*n+1] = sceneAllCol[3*i+1];
-      sceneCol[3*n+2] = sceneAllCol[3*i+2];
-      n++;
-    }
+    if (minDistArr[i] < maskRadius) continue;
+    const z = sceneAllPos[3*i + 2];
+    if (z > zMax) continue;
+    scenePos[3*n]   = sceneAllPos[3*i];
+    scenePos[3*n+1] = sceneAllPos[3*i+1];
+    scenePos[3*n+2] = z;
+    sceneCol[3*n]   = sceneAllCol[3*i];
+    sceneCol[3*n+1] = sceneAllCol[3*i+1];
+    sceneCol[3*n+2] = sceneAllCol[3*i+2];
+    n++;
   }
   sceneGeom.setDrawRange(0, n);
   sceneGeom.attributes.position.needsUpdate = true;
@@ -709,6 +714,7 @@ root.add(axes);
 let nTrails    = 32;
 let trailLen   = 28;
 let trailW     = 2.5;
+let trailSmooth= 1;
 let mixLo      = 0.18;
 let tExp       = 1.0;
 let gtTintCol  = new THREE.Color('#f0529c');
@@ -732,64 +738,110 @@ function rebuildTrailsBaseColors() {
 }
 rebuildTrailsBaseColors();
 
-function setFrame(fi) {
-  // Update GT object cloud
-  const off = fi * K;
-  for (let k = 0; k < K; k++) {
-    if (visArr[off + k]) {
-      const src = (off + k) * 3;
-      objPos[3*k]   = objArr[src];
-      objPos[3*k+1] = objArr[src + 1];
-      objPos[3*k+2] = objArr[src + 2];
-    } else {
-      objPos[3*k] = NaN; objPos[3*k+1] = NaN; objPos[3*k+2] = NaN;
+// Per-track last-known visible position in the new-video timeline,
+// used so the GT object cloud and trails never "blink off" mid-sequence
+// when a few frames of visibility are missing.
+const lastSeen = new Float32Array(K * 3);
+const lastSeenInit = new Uint8Array(K);   // 1 once a real position has been written
+function getPos(fi, k, out, off3) {
+  const v = visArr[fi * K + k];
+  if (v) {
+    const src = (fi * K + k) * 3;
+    out[off3]   = objArr[src];
+    out[off3+1] = objArr[src + 1];
+    out[off3+2] = objArr[src + 2];
+    lastSeen[3*k]   = out[off3];
+    lastSeen[3*k+1] = out[off3+1];
+    lastSeen[3*k+2] = out[off3+2];
+    lastSeenInit[k] = 1;
+    return true;
+  }
+  if (lastSeenInit[k]) {
+    out[off3]   = lastSeen[3*k];
+    out[off3+1] = lastSeen[3*k+1];
+    out[off3+2] = lastSeen[3*k+2];
+    return true;
+  }
+  // Not yet seen — search forward in the timeline for the first visible.
+  for (let f = fi + 1; f < F; f++) {
+    if (visArr[f * K + k]) {
+      const src = (f * K + k) * 3;
+      out[off3]   = objArr[src];
+      out[off3+1] = objArr[src + 1];
+      out[off3+2] = objArr[src + 2];
+      return true;
     }
   }
+  out[off3] = out[off3+1] = out[off3+2] = 0;
+  return false;
+}
+
+function setFrame(fi) {
+  // Reset lastSeen at frame 0 so a fresh playback doesn't carry over old state.
+  if (fi === 0) lastSeenInit.fill(0);
+
+  // Update GT object cloud — every point gets a position (last-known if
+  // currently invisible) so dots never disappear mid-sequence.
+  for (let k = 0; k < K; k++) getPos(fi, k, objPos, 3*k);
   objGeom.attributes.position.needsUpdate = true;
 
-  // Update trail polylines
+  // Update trail polylines (uses lastSeen-fallback so gaps don't crash to origin).
   const tailStart = Math.max(0, fi - trailLen);
+  const _tmp = new Float32Array(3);
   for (let i = 0; i < nTrails; i++) {
     const t = trails[i];
     const k = t.kIdx;
-    // Build positions array: [tailStart..fi]; we always pass F vertices but
-    // setDrawRange isn't on Line2 — easier to rebuild positions every tick
-    // for the ones we actually render. F is small (≤106) so this is fine.
     const N = (fi - tailStart + 1);
     if (N < 2) { t.line.visible = false; continue; }
     t.line.visible = true;
+    // Control points + colours.
     const pos = new Float32Array(N * 3);
     const col = new Float32Array(N * 3);
-    let lastValid = null;
     for (let j = 0; j < N; j++) {
       const fj = tailStart + j;
-      const src = (fj * K + k) * 3;
-      const vis = visArr[fj * K + k];
-      if (vis) {
-        pos[3*j]   = objArr[src];
-        pos[3*j+1] = objArr[src + 1];
-        pos[3*j+2] = objArr[src + 2];
-        lastValid = [pos[3*j], pos[3*j+1], pos[3*j+2]];
-      } else if (lastValid) {
-        // Gap-fill so the line doesn't fly to origin; visible mass stays put.
-        pos[3*j]   = lastValid[0];
-        pos[3*j+1] = lastValid[1];
-        pos[3*j+2] = lastValid[2];
-      } else {
-        pos[3*j] = pos[3*j+1] = pos[3*j+2] = 0;
-      }
-      // Temporal gradient: oldest = pale (mixed toward white), newest = vivid.
+      // Use the same getPos so trail vertices match the dot positions.
+      // We pre-seed lastSeen by replaying frames 0..fi up to here for k —
+      // expensive in pathological cases but cheap for our F ≤ 106.
+      // Simpler: read directly from objArr if visible, else fall back to
+      // lastSeen / forward-search via getPos.
+      getPos(fj, k, _tmp, 0);
+      pos[3*j]   = _tmp[0];
+      pos[3*j+1] = _tmp[1];
+      pos[3*j+2] = _tmp[2];
       const tt = N === 1 ? 1 : (j / (N - 1));
       const k2 = mixLo + (1 - mixLo) * Math.pow(tt, tExp);
-      const r = (1 - k2) + k2 * t.baseR;
-      const g = (1 - k2) + k2 * t.baseG;
-      const b = (1 - k2) + k2 * t.baseB;
-      col[3*j] = r; col[3*j+1] = g; col[3*j+2] = b;
+      col[3*j]   = (1 - k2) + k2 * t.baseR;
+      col[3*j+1] = (1 - k2) + k2 * t.baseG;
+      col[3*j+2] = (1 - k2) + k2 * t.baseB;
     }
-    // LineGeometry expects fresh setPositions/setColors each call.
-    t.geom.setPositions(pos);
-    t.geom.setColors(col);
-    // computeLineDistances only needed for dashed lines; skipping for perf.
+    // Optional Catmull-Rom smoothing of the polyline.
+    if (trailSmooth > 1 && N >= 2) {
+      const ctrl = new Array(N);
+      for (let j = 0; j < N; j++) ctrl[j] = new THREE.Vector3(pos[3*j], pos[3*j+1], pos[3*j+2]);
+      const curve = new THREE.CatmullRomCurve3(ctrl, false, 'catmullrom', 0.5);
+      const M = (N - 1) * trailSmooth + 1;
+      const sP = new Float32Array(M * 3);
+      const sC = new Float32Array(M * 3);
+      const v = new THREE.Vector3();
+      for (let j = 0; j < M; j++) {
+        const u = j / (M - 1);
+        curve.getPoint(u, v);
+        sP[3*j]   = v.x; sP[3*j+1] = v.y; sP[3*j+2] = v.z;
+        // Linear-interp colour by the same parameter so the gradient stays
+        // smooth across the upsampled curve.
+        const cIdx = u * (N - 1);
+        const lo = Math.floor(cIdx), hi = Math.min(N - 1, lo + 1);
+        const f  = cIdx - lo;
+        sC[3*j]   = col[3*lo]   * (1 - f) + col[3*hi]   * f;
+        sC[3*j+1] = col[3*lo+1] * (1 - f) + col[3*hi+1] * f;
+        sC[3*j+2] = col[3*lo+2] * (1 - f) + col[3*hi+2] * f;
+      }
+      t.geom.setPositions(sP);
+      t.geom.setColors(sC);
+    } else {
+      t.geom.setPositions(pos);
+      t.geom.setColors(col);
+    }
   }
   // Hide extra trails
   for (let i = nTrails; i < TRAIL_MAX; i++) trails[i].line.visible = false;
@@ -835,18 +887,14 @@ document.getElementById('rate-sel').addEventListener('change', e => { rate = par
 bind('pc-size',     v => { sceneMat.size = parseFloat(v) * 0.001; setLbl('pc-size-lbl', parseFloat(v).toFixed(1)); });
 bind('obj-size',    v => { objMat.size   = parseFloat(v) * 0.001; setLbl('obj-size-lbl', parseFloat(v).toFixed(1)); });
 bind('mask-r',      v => { maskRadius    = parseFloat(v); setLbl('mask-r-lbl', v); rebuildScene(); });
-// pc-shade / pc-opacity / mask-soft kept for layout; not driving the
-// PointsMaterial path. depth shade is implicit via map+sizeAttenuation;
-// soft mask edge isn't applicable to the alphaTest pipeline.
-bind('pc-shade',    v => { setLbl('pc-shade-lbl', parseFloat(v).toFixed(2)); });
-bind('pc-opacity',  v => { setLbl('pc-opacity-lbl', parseFloat(v).toFixed(2)); });
-bind('mask-soft',   v => { setLbl('mask-soft-lbl', v); });
+bind('zmax',        v => { zMax          = parseFloat(v); setLbl('zmax-lbl', parseFloat(v).toFixed(2)); rebuildScene(); });
 
 // Trajectory sliders
 bind('n-trails',    v => { nTrails = parseInt(v, 10); setLbl('n-trails-lbl', v); rebuildTrailsBaseColors(); setFrame(frame); });
 bind('trail-len',   v => { trailLen = parseInt(v, 10); setLbl('trail-len-lbl', v); setFrame(frame); });
 bind('trail-w',     v => { trailW = parseFloat(v); setLbl('trail-w-lbl', parseFloat(v).toFixed(1));
                             for (const t of trails) t.mat.linewidth = trailW; });
+bind('trail-smooth',v => { trailSmooth = parseInt(v, 10); setLbl('trail-smooth-lbl', v); setFrame(frame); });
 bind('mix-lo',      v => { mixLo = parseFloat(v); setLbl('mix-lo-lbl', parseFloat(v).toFixed(2)); setFrame(frame); });
 bind('t-exp',       v => { tExp  = parseFloat(v); setLbl('t-exp-lbl', parseFloat(v).toFixed(2)); setFrame(frame); });
 bind('col-gt',      v => { document.getElementById('col-gt-h').textContent = v; gtTintCol.set(v); rebuildTrailsBaseColors(); setFrame(frame); }, 'input');
@@ -903,9 +951,8 @@ document.getElementById('sb-close').addEventListener('click', closeSb);
 // Reset all controls
 document.getElementById('sb-reset').addEventListener('click', () => {
   const defaults = {
-    'pc-size': 3, 'pc-shade': 0.55, 'pc-opacity': 0.95,
-    'obj-size': 7, 'mask-r': 30, 'mask-soft': 8,
-    'n-trails': 32, 'trail-len': 28, 'trail-w': 2.5,
+    'pc-size': 3, 'obj-size': 7, 'mask-r': 30, 'zmax': 1.20,
+    'n-trails': 32, 'trail-len': 28, 'trail-w': 2.5, 'trail-smooth': 1,
     'mix-lo': 0.18, 't-exp': 1.0,
     'alpha-gt-tint': 0,
     'cam-w': 2, 'cam-m': 1, 'cam-alpha': 0.9,
@@ -917,14 +964,69 @@ document.getElementById('sb-reset').addEventListener('click', () => {
 });
 
 // Keyboard
+const keys = new Set();
 document.addEventListener('keydown', e => {
   if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  // Movement keys: register as held for the per-frame integrator below.
+  if ('wasdeczq'.includes(k)) { keys.add(k); e.preventDefault(); return; }
   if (e.key === ' ')          { document.getElementById('play-btn').click(); e.preventDefault(); }
   if (e.key === 'ArrowRight') { document.getElementById('step-fwd').click(); e.preventDefault(); }
   if (e.key === 'ArrowLeft')  { document.getElementById('step-back').click(); e.preventDefault(); }
-  if (e.key === 'r')          { initialView(); }
-  if (e.key === '.')          { sidebar.classList.contains('open') ? closeSb() : openSb(); }
+  if (k === 'r')              { initialView(); }
+  if (k === '.')              { sidebar.classList.contains('open') ? closeSb() : openSb(); }
 });
+document.addEventListener('keyup', e => {
+  if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+  keys.delete(e.key.toLowerCase());
+});
+window.addEventListener('blur', () => keys.clear());
+
+// Per-tick movement integrator. WASD pans in the camera-XZ plane (so the
+// view height doesn't drift when you walk around). E/C lift along the
+// world up. Q/Z rotate the orbit azimuth around the current target.
+//
+// Speeds are tuned for a ~1 m scene at 30 fps; modify here if needed.
+const PAN_SPEED   = 0.012;   // metres per tick
+const RISE_SPEED  = 0.012;
+const YAW_SPEED   = 0.025;   // radians per tick
+const _fwd = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+const _offset = new THREE.Vector3();
+const _spherical = new THREE.Spherical();
+function updateNav() {
+  if (keys.size === 0) return;
+  // Camera-relative axes (project forward to horizontal so WASD doesn't tilt).
+  camera.getWorldDirection(_fwd);
+  _fwd.y = 0; _fwd.normalize();
+  _right.crossVectors(_fwd, _up).normalize();
+  let dx = 0, dy = 0, dz = 0;
+  if (keys.has('w')) dz += PAN_SPEED;
+  if (keys.has('s')) dz -= PAN_SPEED;
+  if (keys.has('a')) dx -= PAN_SPEED;
+  if (keys.has('d')) dx += PAN_SPEED;
+  if (keys.has('e')) dy += RISE_SPEED;
+  if (keys.has('c')) dy -= RISE_SPEED;
+  const move = new THREE.Vector3()
+    .addScaledVector(_fwd,   dz)
+    .addScaledVector(_right, dx)
+    .addScaledVector(_up,    dy);
+  camera.position.add(move);
+  controls.target.add(move);
+  // Yaw around target.
+  let dYaw = 0;
+  if (keys.has('q')) dYaw += YAW_SPEED;
+  if (keys.has('z')) dYaw -= YAW_SPEED;
+  if (dYaw !== 0) {
+    _offset.copy(camera.position).sub(controls.target);
+    _spherical.setFromVector3(_offset);
+    _spherical.theta -= dYaw;
+    _offset.setFromSpherical(_spherical);
+    camera.position.copy(controls.target).add(_offset);
+  }
+  controls.update();
+}
 
 // Render loop
 const FPS = 30;
@@ -937,6 +1039,7 @@ function tick(now) {
       lastTick = now;
     }
   }
+  updateNav();
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
